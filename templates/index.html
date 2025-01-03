@@ -5,22 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Image Gallery</title>
     <script>
-        async function updateGallery() {
-            const response = await fetch('/uploaded_images');
-            const images = await response.json();
-            const gallery = document.querySelector('#gallery');
-            gallery.innerHTML = ''; // Clear existing images
-            images.forEach(image => {
-                const img = document.createElement('img');
-                img.src = `/static/uploads/${image}`;
-                img.alt = image;
-                img.style = "max-width: 200px; margin: 10px;";
-                gallery.appendChild(img);
-            });
-        }
-        setInterval(updateGallery, 5000); // Update gallery every 5 seconds
-        updateGallery(); // Initial load
-    </script>
+    async function updateGallery() {
+        const response = await fetch('/uploaded_images');
+        const images = await response.json();
+
+        const gallery = document.querySelector('#gallery');
+        gallery.innerHTML = ''; // Clear existing images
+        images.forEach(image => {
+            const img = document.createElement('img');
+            img.src = `/static/uploads/${image}`;
+            img.alt = image;
+            img.style = "max-width: 400px; margin: 10px;";
+            gallery.appendChild(img);
+        });
+    }
+    setInterval(updateGallery, 1000); // Update gallery every 1 second
+    updateGallery(); // Initial load
+</script>
+
+
 </head>
 <body>
     <h1>Live Image Gallery</h1>
