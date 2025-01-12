@@ -21,10 +21,9 @@ led_red_send_image = PWMLED(27)
 
 # Function to take picture and send it to the server
 def take_picture_and_send_to_server():
-    led_green_take_picture.value = 1  # Turn on the green LED to indicate the picture is being taken
+    led_green_take_picture.value = 1
 
-    # Generate timestamp in the format YYYY-MM-DD-HHMMSS
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     # Capture the image and save it with the timestamped filename
     file_path = f"img/img_{timestamp}.jpg"
@@ -33,9 +32,9 @@ def take_picture_and_send_to_server():
     print(f"Photo saved as {file_path}")
 
     print("Camera: ending")
-    led_green_take_picture.value = 0  # Turn off the green LED after the photo is taken
+    led_green_take_picture.value = 0
 
-    led_red_send_image.value = 1  # Turn on the red LED to indicate image is being sent
+    led_red_send_image.value = 1
 
     SERVER_URL = "http://192.168.1.147:5000/receive"
 
@@ -46,10 +45,9 @@ def take_picture_and_send_to_server():
 
     print(f"Server response: {response.text}")
 
-    led_red_send_image.value = 0  # Turn off the red LED after the image is sent
+    led_red_send_image.value = 0
 
 
-# Assign the function to the button press event
 button_take_picture_send_image.when_pressed = take_picture_and_send_to_server
 
 # Keep the program running to listen for button presses

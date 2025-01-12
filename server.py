@@ -1,8 +1,10 @@
 from flask import Flask, request, render_template, jsonify
+from flask_socketio import SocketIO, emit
 import os
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+socketio = SocketIO(app, async_mode='eventlet')
 
 # Configuration
 UPLOAD_FOLDER = 'static/uploads'
@@ -33,9 +35,8 @@ def receive_image():
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
 
-        # Update current image file
-        with open(CURRENT_IMAGE_FILE, 'w') as f:
-            f.write(filename)
+        # Notify clients about the new image
+        socketio.emit('new_image', {'filename': filename})
 
         return 'Image received and updated successfully', 200
     return 'Invalid file type', 400
@@ -43,14 +44,17 @@ def receive_image():
 
 @app.route('/uploaded_images')
 def uploaded_images():
-    # List all image files in the upload folder
     images = [f for f in os.listdir(UPLOAD_FOLDER) if allowed_file(f)]
-
-    # Sort images alphabetically by filename
     sorted_images = sorted(images, reverse=True)
-
     return jsonify(sorted_images)
 
 
+@app.route('/get-images')
+def get_images():
+    image_folder = os.path.join(app.root_path, 'static', 'uploads')
+    image_files = [f for f in os.listdir(image_folder) if allowed_file(f)]  # Filter valid image files
+    return jsonify(image_files)
+
+
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True, threaded=False)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
