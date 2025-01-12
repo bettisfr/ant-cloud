@@ -1,125 +1,14 @@
-#map {
-    margin: 10px;
-    width: 78%;
-    height: 95vh;
-    float: left;
-}
-
-#sidebar {
-    margin: 10px;
-    width: 20%;
-    height: 95vh;
-    padding: 10px;
-    overflow-y: auto;
-    background-color: #f4f4f4;
-    float: left;
-}
-
-#waypointsList {
-    margin-top: 20px;
-}
-
-#waypointsList strong {
-    display: block;
-    margin-bottom: 10px;
-    font-size: 18px;
-}
-
-#waypointsList div {
-    border-radius: 5px;
-}
-
-#waypointsList div:hover {
-    background-color: #eaeaea;
-}
-
-#globalParameters {
-    margin-top: 20px;
-}
-
-#globalParameters strong {
-    display: block;
-    margin-bottom: 10px;
-    font-size: 18px;
-}
-
-#globalParameters div {
-    border-radius: 5px;
-}
-
-#globalParameters div:hover {
-    background-color: #eaeaea;
-}
-
-.waypoint-coordinates {
-    border: 1px solid #ccc;
-}
-
-div[id^="waypoint-"] {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-div[id^="action-"] {
-  padding-top: 5px;
-}
-
-.actions-list {
-    margin-top: 10px;
-    padding-left: 15px;
-}
-
-.action-item {
-    margin-bottom: 5px;
-    padding-left: 10px;
-    border-left: 2px solid #ccc;
-}
-
-.add-action {
-    color: green;
-    text-decoration: none;
-    padding-left: 10px;
-    font-weight: bold;
-}
-
-.remove-action, .remove-waypoint {
-    color: red;
-    text-decoration: none;
-    padding-left: 10px;
-    font-weight: bold;
-}
-
-.add-action:hover {
-    text-decoration: underline;
-}
-
-.remove-action:hover, .remove-waypoint:hover {
-    text-decoration: underline;
-}
-
-.parameter-input {
-    width: 25%;
-    box-sizing: border-box;
-    float: right;
-    text-align: left;
-}
-
-body {
-    margin: 0;
-    padding: 0;
+#gallery {
     display: flex;
-    justify-content: space-between;
-}
-
-#popup {
-    display: none;
-    background-color: white;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
     padding: 20px;
-    border-radius: 5px;
 }
 
-select {
-    width: 100%;
-    padding: 8px;
-    margin-top: 5px;
+.image-gallery-img {
+    max-width: 400px;
+    margin: 10px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }

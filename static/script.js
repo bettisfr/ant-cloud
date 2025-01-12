@@ -1,14 +1,6 @@
 const socket = io();
 const gallery = document.querySelector('#gallery');
 
-// Initialize the gallery with the title if it's not already there
-if (!gallery.querySelector('h1')) {
-    const title = document.createElement('h1');
-    title.textContent = 'Live Image Gallery';
-    gallery.appendChild(title);
-}
-
-// Function to fetch all images in the /static/uploads/ directory
 function fetchAllImages() {
     fetch('/get-images')
         .then(response => response.json())
@@ -18,7 +10,8 @@ function fetchAllImages() {
                 const img = document.createElement('img');
                 img.src = `/static/uploads/${image}`;
                 img.alt = image;
-                img.style = "max-width: 400px; margin: 10px;";
+                img.classList.add('image-gallery-img');
+
                 gallery.appendChild(img);
             });
         })
@@ -30,12 +23,10 @@ fetchAllImages();
 
 // When a new image is received via socket.io
 socket.on('new_image', (data) => {
-    // Create the new image element
     const img = document.createElement('img');
     img.src = `/static/uploads/${data.filename}`;
     img.alt = data.filename;
-    img.style = "max-width: 400px; margin: 10px;";
+    img.classList.add('image-gallery-img');
 
-    // Append the new image to the gallery
-    gallery.appendChild(img);
+    gallery.prepend(img);
 });

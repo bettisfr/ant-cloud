@@ -1,5 +1,5 @@
 from flask import Flask, request, render_template, jsonify
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 import os
 from werkzeug.utils import secure_filename
 
@@ -8,14 +8,24 @@ socketio = SocketIO(app, async_mode='eventlet')
 
 # Configuration
 UPLOAD_FOLDER = 'static/uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 CURRENT_IMAGE_FILE = os.path.join(UPLOAD_FOLDER, 'current_image.txt')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def get_sorted_images(image_folder):
+    image_files = os.listdir(image_folder)
+
+    image_files_with_timestamp = []
+    for image in image_files:
+        file_path = os.path.join(image_folder, image)
+        modification_time = os.path.getmtime(file_path)
+        image_files_with_timestamp.append((image, modification_time))
+
+    sorted_images = sorted(image_files_with_timestamp, key=lambda x: x[1], reverse=True)
+
+    sorted_image_filenames = [image for image, _ in sorted_images]
+    return sorted_image_filenames
 
 
 @app.route('/')
@@ -30,7 +40,7 @@ def receive_image():
     file = request.files['image']
     if file.filename == '':
         return 'No selected file', 400
-    if file and allowed_file(file.filename):
+    if file.filename.endswith('.jpg'):  # Only accept .jpg files
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
@@ -44,16 +54,14 @@ def receive_image():
 
 @app.route('/uploaded_images')
 def uploaded_images():
-    images = [f for f in os.listdir(UPLOAD_FOLDER) if allowed_file(f)]
-    sorted_images = sorted(images, reverse=True)
+    sorted_images = get_sorted_images(UPLOAD_FOLDER)
     return jsonify(sorted_images)
 
 
 @app.route('/get-images')
 def get_images():
-    image_folder = os.path.join(app.root_path, 'static', 'uploads')
-    image_files = [f for f in os.listdir(image_folder) if allowed_file(f)]  # Filter valid image files
-    return jsonify(image_files)
+    sorted_images = get_sorted_images(UPLOAD_FOLDER)
+    return jsonify(sorted_images)
 
 
 if __name__ == '__main__':
