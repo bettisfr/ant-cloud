@@ -167,7 +167,7 @@ def send_image_to_server(file_path: str) -> None:
         if not humidity is None:
             print(f"Humidity: {humidity:.1f}%")
 
-        add_gps_metadata(img_file, latitude, longitude, temperature, humidity)
+        add_gps_metadata(file_path, latitude, longitude, temperature, humidity)
 
         files = {'image': img_file}
         response = requests.post(SERVER_URL, files=files)
