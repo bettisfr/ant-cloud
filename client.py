@@ -160,9 +160,12 @@ def send_image_to_server(file_path: str) -> None:
 
         # Print the results
         print(f"Timestamp: {timestamp}")
-        print(f"GPS Coordinates: Latitude={latitude:.6f}, Longitude={longitude:.6f}")
-        print(f"Temperature: {temperature:.1f}°C")
-        print(f"Humidity: {humidity:.1f}%")
+        if not (latitude is None or longitude is None):
+            print(f"GPS Coordinates: Latitude={latitude:.6f}, Longitude={longitude:.6f}")
+        if not temperature is None:
+            print(f"Temperature: {temperature:.1f}°C")
+        if not humidity is None:
+            print(f"Humidity: {humidity:.1f}%")
 
         add_gps_metadata(img_file, latitude, longitude, temperature, humidity)
 
