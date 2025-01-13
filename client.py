@@ -1,16 +1,19 @@
+from gpiozero import Button, PWMLED
+from picamera2 import Picamera2
+from time import sleep
+import requests
+from datetime import datetime
+import piexif
+from PIL import Image
 import serial
 import adafruit_dht
 import board
-import time
-from datetime import datetime
-from gpiozero import Button, PWMLED
-from signal import pause
-from picamera2 import Picamera2
-import requests
 
-# GPS and DHT setup
-ser = serial.Serial("/dev/ttyS0", 9600)  # GPS serial port
-dht_device = adafruit_dht.DHT11(board.D18)  # GPIO 18 for DHT sensor
+# Initialize serial port for GPS
+ser = serial.Serial("/dev/ttyS0", 9600)  # Use correct baud rate for your GPS module
+
+# Initialize the DHT sensor
+dht_device = adafruit_dht.DHT11(board.D18)  # GPIO 18
 
 # Camera setup
 picam2 = Picamera2()
@@ -25,114 +28,84 @@ button_take_picture_send_image = Button(2)
 led_green_take_picture = PWMLED(17)
 led_red_send_image = PWMLED(27)
 
-
 # Function to parse GPS coordinates from NMEA sentence
 def parse_coordinates(coord, direction):
-    """Convert NMEA coordinates to decimal degrees."""
     if not coord or not direction:
         return None
-
-    # Determine how many digits to use for degrees
-    if direction in ['N', 'S']:
-        degrees_length = 2  # Latitude uses 2 digits for degrees
-    elif direction in ['E', 'W']:
-        degrees_length = 3  # Longitude uses 3 digits for degrees
-    else:
-        return None  # Invalid direction
-
-    # Split into degrees and minutes
+    degrees_length = 2 if direction in ['N', 'S'] else 3
     degrees = int(coord[:degrees_length])
     minutes = float(coord[degrees_length:])
     decimal = degrees + (minutes / 60)
+    return -decimal if direction in ['S', 'W'] else decimal
 
-    # Apply direction (N/S or E/W)
-    if direction in ['S', 'W']:
-        decimal = -decimal
-
-    return decimal
-
-
-# Retrieve GPS data
+# Function to get GPS data
 def get_gps_data():
     while True:
         received_data = ser.readline().decode('ascii', errors='ignore').strip()
         if received_data.startswith('$GPGGA'):
             try:
                 gpgga_data = received_data.split(',')
-                raw_latitude = gpgga_data[2]
-                latitude_dir = gpgga_data[3]
-                raw_longitude = gpgga_data[4]
-                longitude_dir = gpgga_data[5]
-                latitude = parse_coordinates(raw_latitude, latitude_dir)
-                longitude = parse_coordinates(raw_longitude, longitude_dir)
-                if latitude is not None and longitude is not None:
-                    return latitude, longitude
+                latitude = parse_coordinates(gpgga_data[2], gpgga_data[3])
+                longitude = parse_coordinates(gpgga_data[4], gpgga_data[5])
+                return latitude, longitude
             except (IndexError, ValueError):
                 return None, None
 
-
-# Read temperature and humidity
-def get_dht_data():
-    try:
-        temperature = dht_device.temperature
-        humidity = dht_device.humidity
-        if temperature is not None and humidity is not None:
-            return temperature, humidity
-    except RuntimeError as e:
-        print(f"Error reading DHT sensor: {e}")
-    return None, None
-
-
-# Capture and send image to the server
-def take_picture_and_send_to_server():
+# Function to capture image and add metadata
+def take_picture_with_metadata():
     led_green_take_picture.value = 1
+
+    # Generate a timestamped filename
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     file_path = f"img/img_{timestamp}.jpg"
+
+    # Capture the image
     print("Capturing photo...")
     picam2.capture_file(file_path)
     print(f"Photo saved as {file_path}")
-    led_green_take_picture.value = 0
 
-    led_red_send_image.value = 1
-    SERVER_URL = "http://192.168.1.147:5000/receive"
-    with open(file_path, 'rb') as img_file:
-        files = {'image': img_file}
-        response = requests.post(SERVER_URL, files=files)
-    print(f"Server response: {response.text}")
-    led_red_send_image.value = 0
-
-
-# Periodically log GPS, temperature, and humidity data
-def log_environment_data():
+    # Get GPS, temperature, and humidity
+    latitude, longitude = get_gps_data()
     try:
-        while True:
-            latitude, longitude = get_gps_data()
-            if latitude is not None and longitude is not None:
-                print(f"GPS Coordinates: Latitude={latitude:.6f}, Longitude={longitude:.6f}")
-            else:
-                print("GPS data not available.")
+        temperature = dht_device.temperature
+        humidity = dht_device.humidity
+    except RuntimeError as e:
+        print(f"Error reading DHT sensor: {e}")
+        temperature, humidity = None, None
 
-            temperature, humidity = get_dht_data()
-            if temperature is not None and humidity is not None:
-                print(f"Temperature: {temperature:.1f}°C, Humidity: {humidity:.1f}%")
-            else:
-                print("Failed to retrieve DHT sensor data.")
+    # Prepare metadata
+    exif_data = {
+        "0th": {
+            piexif.ImageIFD.ImageDescription: f"Captured on {timestamp}",
+            piexif.ImageIFD.Artist: "Raspberry Pi",
+        },
+        "GPS": {
+            piexif.GPSIFD.GPSLatitudeRef: 'N' if latitude >= 0 else 'S',
+            piexif.GPSIFD.GPSLatitude: piexif.GPSHelper.deg_to_dms_rational(abs(latitude)),
+            piexif.GPSIFD.GPSLongitudeRef: 'E' if longitude >= 0 else 'W',
+            piexif.GPSIFD.GPSLongitude: piexif.GPSHelper.deg_to_dms_rational(abs(longitude)),
+        },
+    }
 
-            print("Waiting for next reading...")
-            time.sleep(10)  # Adjust delay as needed
-    except KeyboardInterrupt:
-        print("Stopping environment data logging.")
-    finally:
-        dht_device.exit()
+    if temperature is not None and humidity is not None:
+        exif_data["0th"][piexif.ImageIFD.UserComment] = f"Temp: {temperature:.1f}C, Humidity: {humidity:.1f}%"
 
+    # Embed metadata into the image
+    piexif.insert(piexif.dump(exif_data), file_path)
+    print("Metadata added to the image.")
 
-# Start environment data logging in a separate thread
-import threading
+    led_green_take_picture.value = 0
+    print("Photo processing complete.")
 
-threading.Thread(target=log_environment_data, daemon=True).start()
+# Button press handler
+button_take_picture_send_image.when_pressed = take_picture_with_metadata
 
-# Set up button to trigger photo capture and image upload
-button_take_picture_send_image.when_pressed = take_picture_and_send_to_server
-
-# Keep the program running
-pause()
+# Keep the program running to listen for button presses
+print("Ready to capture photos. Press the button to capture.")
+try:
+    while True:
+        sleep(1)
+except KeyboardInterrupt:
+    print("Program stopped by user.")
+finally:
+    dht_device.exit()
