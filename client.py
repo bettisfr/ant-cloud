@@ -117,7 +117,7 @@ def add_gps_metadata(image_path, latitude=None, longitude=None, temperature=None
         custom_metadata.append(f"Temperature={temperature}")
     if humidity is not None:
         custom_metadata.append(f"Humidity={humidity}")
-    user_comment = " | ".join(custom_metadata) if custom_metadata else "No custom data"
+    user_comment = "|".join(custom_metadata) if custom_metadata else "No custom data"
 
     # Convert degrees to GPS format (degrees, minutes, seconds)
     def to_gps_format(value):
