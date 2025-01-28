@@ -22,7 +22,7 @@ Welcome to **Ant Detector**, an innovative solution for capturing and analyzing 
 
 Before diving into Ant Detector, make sure you have these tools installed:
 
-- **Python 3 ([Download](https://www.python.org/downloads/))
+- **Python 3** ([Download](https://www.python.org/downloads/))
 - **pip** (Python's package manager, usually bundled with Python)
 
 ### Steps to Get Started 🚀
