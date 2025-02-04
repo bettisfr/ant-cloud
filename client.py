@@ -13,7 +13,8 @@ import time
 from datetime import datetime
 
 # Constants
-SERVER_URL = "http://192.168.1.147:5000/receive"
+#SERVER_URL = "http://192.168.1.147:5000/receive"
+SERVER_URL = "http://141.250.25.160:5000/receive"
 IMAGE_DIR = "img"
 
 # Camera setup
