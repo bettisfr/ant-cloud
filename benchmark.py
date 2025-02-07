@@ -1,7 +1,6 @@
-import os
-import signal
+import json
 import subprocess
-from time import time, sleep
+from time import time
 import numpy as np
 import re
 
@@ -48,23 +47,21 @@ def run_remote_script(argument):
     # Record the end timestamp
     end_time = time()
 
-    pattern = r"max_RAM=(\d+\.\d+)\navg_RAM=(\d+\.\d+)"
+    try:
+        data = json.loads(stdout.decode())  # Convert JSON string to Python dictionary
 
-    # Find matches using the pattern
-    matches = re.search(pattern, stdout.decode())
-
-    # If matches are found, extract the values
-    if matches:
-        max_ram = float(matches.group(1))
-        avg_ram = float(matches.group(2))
+        max_ram = float(data["max_RAM_MB"])
+        avg_ram = float(data["avg_RAM_MB"])
+        max_cpu = float(data["max_CPU_percent"])
+        avg_cpu = float(data["avg_CPU_percent"])
 
         max_RAM.append(max_ram)
         avg_RAM.append(avg_ram)
+        max_CPU.append(max_cpu)
+        avg_CPU.append(avg_cpu)
 
-        max_CPU.append(0)
-        avg_CPU.append(0)
-    else:
-        print("No matches found")
+    except json.JSONDecodeError as e:
+        print("Error decoding JSON:", e)
 
     return start_time, end_time
 
