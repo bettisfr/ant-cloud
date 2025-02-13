@@ -23,6 +23,10 @@ logging.basicConfig(
 )
 
 # Constants
+<<<<<<< HEAD
+=======
+#SERVER_URL = "http://192.168.1.147:5000/receive"
+>>>>>>> refs/remotes/origin/main
 SERVER_URL = "http://141.250.25.160:5000/receive"
 IMAGE_DIR = "img"
 
