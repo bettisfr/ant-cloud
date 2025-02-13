@@ -36,8 +36,9 @@ function addImageToGallery(imageData, isRealTime = true) {
     metadataDiv.classList.add('image-metadata');
     metadataDiv.innerHTML = `
         <strong>${imageData.filename}</strong><br>
-        Temperature: ${imageData.metadata?.temperature ?? 'N/A'}°C<br>
-        Humidity: ${imageData.metadata?.humidity ?? 'N/A'}%<br>
+        Temperature: ${imageData.metadata?.temperature ?? 'N/A'} °C<br>
+        Pressure: ${imageData.metadata?.pressure ?? 'N/A'} hPa<br>
+        Humidity: ${imageData.metadata?.humidity ?? 'N/A'} %<br>
         GPS: (${imageData.metadata?.latitude ?? 'N/A'}, ${imageData.metadata?.longitude ?? 'N/A'})<br>
         ${isRealTime ? '<em>Uploaded just now</em>' : ''}
     `;
