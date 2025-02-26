@@ -134,11 +134,10 @@ if __name__ == '__main__':
     ends = []
 
     mods = ["v10m", "v10n", "v10s", "v11m", "v11n", "v11s", "v9m", "v9s", "v9t"]
-    precs = ["FP32", "FP16", "INT8"]
-    forms = ["openvino", "mnn", "tflite"]
+    # precs = ["FP32", "FP16", "INT8"]
     # mods = ["v10m", "v10n"]
-    # precs = ["FP32", "INT8"]
-    # forms = ["mnn", "tflite"]
+    precs = ["FP32"]
+    forms = ["openvino", "mnn", "tflite", "ncnn", "pytorch"]
 
     # Need this to be run first
     for mod in mods:

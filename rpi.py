@@ -81,8 +81,12 @@ def profile_function(func, *args, **kwargs):
 
 
 def convert_model(mod, prec, form):
-    if prec == "INT8" and form == "tflite":
+    if prec == "INT8" and (form == "tflite" or form == "ncnn"):
         print("Not supported!!")
+        return
+
+    if form == "pytorch":
+        print("PyTorch does not need conversion!!")
         return
 
     path_test = os.path.join("src", "learning", "test", "images")
@@ -133,6 +137,14 @@ def run_test(mod, prec, form):
         print("Not supported!!")
         return
 
+    if form == "pytorch" and prec != "FP32":
+        print("PyTorch only FP32!!")
+        return
+
+    if "10" in mod and form == "ncnn":
+        print("YOLOv10 and NCNN is not supported")
+        return
+
     path_test = os.path.join("src", "learning", "test", "images")
     ims_list = os.listdir(path_test)
 
@@ -140,7 +152,9 @@ def run_test(mod, prec, form):
 
     new_model = ""
 
-    if form == "openvino":
+    if form == "pytorch":
+        models_directory = os.path.join(weights_directory, "best.pt")
+    elif form == "openvino":
         models_directory = os.path.join(weights_directory, f"{mod}_{prec}_{form}")
         if prec == "INT8":
             new_model = os.path.join(weights_directory, "best_int8_openvino_model")
@@ -201,8 +215,8 @@ def convert_all():
     precs = ["FP32", "FP16", "INT8"]
     forms = ["tflite", "openvino", "mnn"]
 
-    mods = ["v10m"]
-    precs = ["FP32", "FP16", "INT8"]
+    mods = ["v10m", "v10n", "v10s", "v11m", "v11n", "v11s", "v9m", "v9s", "v9t"]
+    precs = ["FP16", "FP32"]
     forms = ["ncnn"]
 
     for mod in mods:
@@ -211,3 +225,4 @@ def convert_all():
                 print(f"Doing: {mod} {prec} {form}")
 
                 convert_model(mod, prec, form)
+
