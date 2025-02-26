@@ -52,15 +52,19 @@ def extract_metadata(image_path):
 
 
         temperature = metadata.get("Temperature", "N/A")
+        pressure = metadata.get("Pressure", "N/A")
         humidity = metadata.get("Humidity", "N/A")
 
         return {
-            "temperature": float(temperature) if temperature.replace(".", "", 1).isdigit() else "N/A",
-            "humidity": float(humidity) if humidity.replace(".", "", 1).isdigit() else "N/A",
-            "latitude": latitude,
-            "longitude": longitude,
+            "temperature": float(temperature) if temperature.replace(".", "", 1).isdigit() and float(temperature) != 0 else None,
+            "pressure": float(pressure) if pressure.replace(".", "", 1).isdigit() and float(pressure) != 0 else None,
+            "humidity": float(humidity) if humidity.replace(".", "", 1).isdigit() and float(humidity) != 0 else None,
+            "latitude": round(latitude, 6) if latitude != 0 else None,
+            "longitude": round(longitude, 6) if longitude != 0 else None,
             "user_comment": user_comment
         }
+
+
     except Exception as e:
         print(f"Error extracting metadata from {image_path}: {e}")
         return {}
