@@ -116,15 +116,20 @@ def convert_model(mod, prec, form):
             os.path.join(weights_dir, "best_saved_model"),
             os.path.join(weights_dir, f"{mod}_{prec}_{form}")
         )
-    else:
+    elif form == "mnn":
         safe_rename(
             os.path.join(weights_dir, "best.mnn"),
             os.path.join(weights_dir, f"{mod}_{prec}_{form}.mnn")
         )
+    elif form == "ncnn":
+        safe_rename(
+            os.path.join(weights_dir, "best_ncnn_model"),
+            os.path.join(weights_dir, f"{mod}_{prec}_{form}")
+        )
 
 
 def run_test(mod, prec, form):
-    if prec == "INT8" and form == "tflite":
+    if prec == "INT8" and (form == "tflite" or form == "ncnn"):
         print("Not supported!!")
         return
 
@@ -147,11 +152,15 @@ def run_test(mod, prec, form):
     elif form == "tflite":
         models_directory = os.path.join(weights_directory, f"{mod}_{prec}_{form}")
         new_model = os.path.join(weights_directory, "best_saved_model")
-
         safe_remove(new_model)
         shutil.copytree(models_directory, new_model)
-    else:
+    elif form == "mnn":
         models_directory = os.path.join(weights_directory, f"{mod}_{prec}_{form}.mnn")
+    elif form == "ncnn":
+        models_directory = os.path.join(weights_directory, f"{mod}_{prec}_{form}")
+        new_model = os.path.join(weights_directory, "best_ncnn_model")
+        safe_remove(new_model)
+        shutil.copytree(models_directory, new_model)
 
     if new_model == "":
         new_model = models_directory
@@ -184,12 +193,17 @@ def run_test(mod, prec, form):
 
     print("RESULTS")
     print(json.dumps(stats, indent=4))
+    print("RESULTS")
 
 
-def test_main():
+def convert_all():
     mods = ["v10m", "v10n", "v10s", "v11m", "v11n", "v11s", "v9m", "v9s", "v9t"]
     precs = ["FP32", "FP16", "INT8"]
     forms = ["tflite", "openvino", "mnn"]
+
+    mods = ["v10m"]
+    precs = ["FP32", "FP16", "INT8"]
+    forms = ["ncnn"]
 
     for mod in mods:
         for prec in precs:
