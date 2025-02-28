@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 
 # Raspberry Pi SSH details
-HOST = "192.168.1.197"
+# HOST = "192.168.1.197" # RPi5
+HOST = "192.168.1.178" # RPi3
 USER = "fra"
 PRIVATE_KEY_PATH = "~/.ssh/id_rsa"
 SCRIPT_FOLDER = "/home/fra/model-tests/exp_time_resource/"
@@ -52,6 +53,7 @@ def run_remote_script(mod, prec, form):
 
     try:
         data = json.loads(stdout.decode().split("RESULTS")[1])
+        print(f"{argument} - {data}")
 
         max_ram = float(data["max_RAM_MB"])
         avg_ram = float(data["avg_RAM_MB"])
@@ -133,9 +135,13 @@ if __name__ == '__main__':
     starts = []
     ends = []
 
-    mods = ["v10m", "v10n", "v10s", "v11m", "v11n", "v11s", "v9m", "v9s", "v9t"]
+    # RPi5
+    # mods = ["v10n", "v10s", "v10m", "v11n", "v11s", "v11m", "v9s", "v9m", "v9t"]
+
+    # RPi3
+    mods = ["v10n", "v10s", "v11n", "v11s", "v9s", "v9m"]
+
     # precs = ["FP32", "FP16", "INT8"]
-    # mods = ["v10m", "v10n"]
     precs = ["FP32"]
     forms = ["openvino", "mnn", "tflite", "ncnn", "pytorch"]
 
@@ -143,7 +149,13 @@ if __name__ == '__main__':
     for mod in mods:
         for prec in precs:
             for form in forms:
-                if prec == "INT8" and form == "tflite":
+                if prec == "INT8" and (form == "tflite" or form == "ncnn"):
+                    continue
+
+                if form == "pytorch" and prec != "FP32":
+                    continue
+
+                if "10" in mod and form == "ncnn":
                     continue
 
                 exps.append(f"{mod} {prec} {form}")
