@@ -42,16 +42,15 @@ led_red.blink(on_time=0.5, off_time=0.5, n=10, background=True)
 
 # Camera setup
 picam2 = Picamera2()
-
-# Configure camera for still images
 picam2.configure(picam2.create_still_configuration())
 
-# Set autofocus mode: 2 = continuous, 1 = auto (one-time focus)
-picam2.set_controls({"AfMode": 2})  # Continuous autofocus
+# Set manual focus mode and close focus
+picam2.set_controls({"AfMode": 0})  # Manual focus mode
+picam2.set_controls({"LensPosition": 0.0})  # Try values: 0.0 to 2.0
 
 logging.info("Initializing camera...")
 picam2.start()
-logging.info("Camera initialized with continuous autofocus.")
+logging.info("Camera started in manual focus mode.")
 
 # GPS
 try:
@@ -260,9 +259,33 @@ def handle_button_press() -> None:
         led_blue.blink(on_time=0.5, off_time=0.5, n=1000, background=True)
 
 
+def focus_sweep(start=0.0, end=2.0, step=0.1, delay=0.5):
+    """Sweep through manual focus positions and capture images for visual comparison."""
+    logging.info("Starting focus sweep...")
+    if not os.path.exists(IMAGE_DIR):
+        os.makedirs(IMAGE_DIR)
+
+    positions = [round(start + i * step, 2) for i in range(int((end - start) / step) + 1)]
+
+    for pos in positions:
+        logging.info(f"Setting lens position to {pos}")
+        picam2.set_controls({"AfMode": 0})  # Manual focus mode
+        picam2.set_controls({"LensPosition": pos})
+        time.sleep(delay)
+
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        file_path = f"{IMAGE_DIR}/focus_{pos:.2f}_{timestamp}.jpg"
+        picam2.capture_file(file_path)
+        logging.info(f"Captured {file_path}")
+
+    logging.info("Focus sweep completed.")
+
 
 # Event binding
 capture_button.when_pressed = handle_button_press
+
+# Test
+focus_sweep()
 
 # Keep the program running to listen for button presses
 pause()
