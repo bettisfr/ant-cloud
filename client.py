@@ -42,7 +42,14 @@ led_red.blink(on_time=0.5, off_time=0.5, n=10, background=True)
 
 # Camera setup
 picam2 = Picamera2()
+
+# Configure camera for still images
 picam2.configure(picam2.create_still_configuration())
+
+# Set autofocus mode to manual and lens position to close focus
+picam2.set_controls({"AfMode": 0})  # 0 = Manual focus
+picam2.set_controls({"LensPosition": 0.0})  # 0.0 = close focus, up to ~10.0 for distant
+
 logging.info("Initializing camera...")
 picam2.start()
 logging.info("Camera initialized and ready.")
