@@ -259,33 +259,9 @@ def handle_button_press() -> None:
         led_blue.blink(on_time=0.5, off_time=0.5, n=1000, background=True)
 
 
-def focus_sweep(start=0.0, end=2.0, step=0.1, delay=0.5):
-    """Sweep through manual focus positions and capture images for visual comparison."""
-    logging.info("Starting focus sweep...")
-    if not os.path.exists(IMAGE_DIR):
-        os.makedirs(IMAGE_DIR)
-
-    positions = [round(start + i * step, 2) for i in range(int((end - start) / step) + 1)]
-
-    for pos in positions:
-        logging.info(f"Setting lens position to {pos}")
-        picam2.set_controls({"AfMode": 0})  # Manual focus mode
-        picam2.set_controls({"LensPosition": pos})
-        time.sleep(delay)
-
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        file_path = f"{IMAGE_DIR}/focus_{pos:.2f}_{timestamp}.jpg"
-        picam2.capture_file(file_path)
-        logging.info(f"Captured {file_path}")
-
-    logging.info("Focus sweep completed.")
-
 
 # Event binding
 capture_button.when_pressed = handle_button_press
-
-# Test
-focus_sweep()
 
 # Keep the program running to listen for button presses
 pause()
