@@ -38,6 +38,13 @@ This repository contains a complete client-server pipeline for remote wildlife/i
 
 ### 🖥 Server Setup
 
+After starting the server, the web gallery is accessible at:
+```
+http://<server-ip>:5000
+```
+Replace `<server-ip>` with the actual IP address or hostname of the server.
+
+
 ```bash
 pip install -r requirements.txt
 python server.py
