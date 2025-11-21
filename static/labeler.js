@@ -10,6 +10,17 @@ let drawPreview = null;
 const DEL_SIZE = 16;
 const DEL_PAD = 4;
 
+// Hardcoded YOLO class → species name map
+const CLASS_MAP = {
+    0: "Camponotus vagus",
+    1: "Plagiolepis pygmaea",
+    2: "Crematogaster scutellaris",
+    3: "Temnothorax spp.",
+    4: "Dolichoderus quadripunctatus",
+    5: "Colobopsis truncata"
+};
+
+
 document.addEventListener("DOMContentLoaded", () => {
     initBboxInteraction();
     initZoom();
@@ -274,8 +285,10 @@ function drawBBoxes(imgEl, canvasEl, labs) {
         ctx.fillRect(x, y, w, h);
         ctx.strokeRect(x, y, w, h);
 
-        const clsText = lab.cls ?? 0;
-        drawClassIcon(ctx, clsText, x + DEL_PAD, y + DEL_PAD, DEL_SIZE);
+        const species = CLASS_MAP[lab.cls] || lab.cls;
+        const initials = species.split(/\s+/).map(w => w[0]).join("").toUpperCase();
+        drawClassIcon(ctx, initials, x + DEL_PAD, y + DEL_PAD, DEL_SIZE);
+
         drawDeleteIcon(ctx, x + w - DEL_PAD - DEL_SIZE, y + DEL_PAD, DEL_SIZE);
 
         if (selected) {
@@ -571,26 +584,34 @@ function renderLabelsList() {
         row.appendChild(idx);
 
         const clsLabel = document.createElement("span");
-        clsLabel.textContent = "cls:";
+        clsLabel.textContent = CLASS_MAP[lab.cls] || `Class ${lab.cls}`;
+        clsLabel.style.fontWeight = "bold";
         row.appendChild(clsLabel);
 
-        const clsInput = document.createElement("input");
-        clsInput.type = "number";
-        clsInput.min = "0";
-        clsInput.max = "10";
-        clsInput.step = "1";
-        clsInput.value = lab.cls ?? 0;
+        const clsInput = document.createElement("select");
+
+        for (const [id, species] of Object.entries(CLASS_MAP)) {
+            const opt = document.createElement("option");
+            opt.value = id;
+            opt.textContent = species;
+            if (parseInt(id) === lab.cls) opt.selected = true;
+            clsInput.appendChild(opt);
+        }
+
         clsInput.style.width = "3.5em";
 
         clsInput.addEventListener("change", (e) => {
-            const newVal = parseInt(e.target.value, 10);
-            lab.cls = isNaN(newVal) ? 0 : newVal;
-            drawBBoxes(
-                document.getElementById("previewImage"),
-                document.getElementById("bboxCanvas"),
-                labels
-            );
-        });
+        const newVal = parseInt(e.target.value, 10);
+        lab.cls = newVal;
+
+        drawBBoxes(
+            document.getElementById("previewImage"),
+            document.getElementById("bboxCanvas"),
+            labels
+        );
+        renderLabelsList();
+    });
+
 
         row.appendChild(clsInput);
 
