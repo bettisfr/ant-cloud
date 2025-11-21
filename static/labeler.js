@@ -1,0 +1,615 @@
+let currentImage = null;      // { name: "img_....jpg" }
+let labels = [];
+let selectedId = null;
+let dragMode = "idle";
+let activeHandle = -1;
+let createMode = false;
+let drawStartPt = null;
+let drawPreview = null;
+
+const DEL_SIZE = 16;
+const DEL_PAD = 4;
+
+document.addEventListener("DOMContentLoaded", () => {
+    initBboxInteraction();
+    initZoom();
+
+    setStatus("Waiting for image parameter (?image=...).");
+
+    const newBtn = document.getElementById("newBoxBtn");
+    if (newBtn) {
+        newBtn.addEventListener("click", () => {
+            setStatus("Draw a new box: click and drag on the image.");
+            createMode = true;
+            selectedId = null;
+        });
+    }
+
+    const saveBtn = document.getElementById("saveTxtBtn");
+    if (saveBtn) {
+        saveBtn.addEventListener("click", () => {
+            saveLabels();
+        });
+    }
+
+    // No file picker, no placeholder: read ?image=... and load server-side image
+    initFromQueryParam();
+});
+
+/* -------------------- IMAGE LOADING (server-side) -------------------- */
+
+function initFromQueryParam() {
+    const params = new URLSearchParams(window.location.search);
+    const imageName = params.get("image");
+
+    if (!imageName) {
+        setStatus("No image specified. Call as /label?image=filename.jpg");
+        return;
+    }
+
+    loadServerImage(imageName);
+}
+
+async function loadServerImage(filename) {
+    const img = document.getElementById("previewImage");
+    const canvas = document.getElementById("bboxCanvas");
+
+    const imgURL = `/static/uploads/${filename}`;
+
+    img.onload = () => {
+        fitCanvasToImage(img, canvas);
+        drawBBoxes(img, canvas, labels);   // first draw (maybe still no labels)
+    };
+
+    img.onerror = () => {
+        setStatus(`Cannot load image: ${imgURL}`);
+    };
+
+    img.src = imgURL;
+
+    currentImage = { name: filename };
+    labels = [];
+    selectedId = null;
+
+    const base = filename.replace(/\.[^.]+$/, "");
+    const labelsURL = `/static/labels/${base}.txt`;
+
+    try {
+        const res = await fetch(labelsURL);
+        if (res.ok) {
+            const txt = await res.text();
+            labels = parseYoloTxt(txt);
+        }
+    } catch (err) {
+        console.warn("Error while fetching labels:", err);
+    }
+
+    // 🔴 THIS WAS MISSING: redraw after labels are loaded
+    drawBBoxes(img, canvas, labels);
+
+    renderLabelsList();
+    document.getElementById("imgName").textContent = filename;
+    document.getElementById("numLabels").textContent = labels.length;
+
+    const controls = document.getElementById("controlsArea");
+    if (controls) {
+        controls.classList.remove("disabled");
+    }
+
+    setStatus(`Loaded ${filename} (${labels.length} labels)`);
+}
+
+
+/* -------------------- ICONS & STATUS -------------------- */
+
+function drawDeleteIcon(ctx, x, y, size = DEL_SIZE) {
+    const r = 3;
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 1.5;
+    const w = size, h = size;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 4, y + 4);
+    ctx.lineTo(x + w - 4, y + h - 4);
+    ctx.moveTo(x + w - 4, y + 4);
+    ctx.lineTo(x + 4, y + h - 4);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawClassIcon(ctx, text, x, y, size = DEL_SIZE) {
+    const r = 3;
+    ctx.save();
+
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 1;
+
+    const w = size;
+    const h = size;
+
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "black";
+    ctx.font = `${size * 0.6}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(text), x + w / 2, y + h / 2);
+
+    ctx.restore();
+}
+
+function isInsideDeleteIcon(px, py, boxX, boxY, boxW, boxH) {
+    const ix = boxX + boxW - DEL_PAD - DEL_SIZE;
+    const iy = boxY + DEL_PAD;
+    return (px >= ix && px <= ix + DEL_SIZE && py >= iy && py <= iy + DEL_SIZE);
+}
+
+function setStatus(msg) {
+    const s = document.getElementById("status");
+    if (s) {
+        s.textContent = msg;
+    }
+}
+
+/* -------------------- PARSING / SAVING LABELS -------------------- */
+
+function parseYoloTxt(text) {
+    const lines = text.split(/\r?\n/);
+    const out = [];
+    for (const line of lines) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length === 5) {
+            const [cls, xc, yc, w, h] = parts.map(Number);
+            out.push({ cls, x_center: xc, y_center: yc, width: w, height: h });
+        }
+    }
+    return out;
+}
+
+// Server-side save: POST JSON to /save_labels
+async function saveLabels() {
+    if (!currentImage || !currentImage.name) {
+        setStatus("No image loaded, cannot save.");
+        return;
+    }
+
+    try {
+        const payload = {
+            image: currentImage.name,
+            labels: labels.map(l => ({
+                cls: l.cls ?? 0,
+                x_center: l.x_center,
+                y_center: l.y_center,
+                width: l.width,
+                height: l.height
+            }))
+        };
+
+        const res = await fetch("/save_labels", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            throw new Error("HTTP " + res.status);
+        }
+
+        const data = await res.json();
+        if (data.status !== "success") {
+            throw new Error(data.message || "Unknown error");
+        }
+
+        setStatus(data.message || "Labels saved.");
+    } catch (err) {
+        setStatus("Save failed: " + (err && err.message ? err.message : err));
+    }
+}
+
+
+/* -------------------- CANVAS & DRAWING -------------------- */
+
+function fitCanvasToImage(imgEl, canvasEl) {
+    const w = imgEl.clientWidth;
+    const h = imgEl.clientHeight;
+    if (!w || !h) {
+        return;
+    }
+    canvasEl.width = w;
+    canvasEl.height = h;
+    canvasEl.style.width = w + "px";
+    canvasEl.style.height = h + "px";
+}
+
+function drawBBoxes(imgEl, canvasEl, labs) {
+    if (!imgEl || !canvasEl) return;
+    fitCanvasToImage(imgEl, canvasEl);
+
+    const ctx = canvasEl.getContext("2d");
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+    if (!labs || labs.length === 0) return;
+    const W = canvasEl.width, H = canvasEl.height;
+
+    for (let i = 0; i < labs.length; i++) {
+        const lab = labs[i];
+        const x = (lab.x_center - lab.width / 2) * W;
+        const y = (lab.y_center - lab.height / 2) * H;
+        const w = lab.width * W;
+        const h = lab.height * H;
+
+        const selected = (i === selectedId);
+        ctx.lineWidth = selected ? 3 : 2;
+        ctx.strokeStyle = "red";
+        ctx.fillStyle = "rgba(255,0,0,0.12)";
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+
+        const clsText = lab.cls ?? 0;
+        drawClassIcon(ctx, clsText, x + DEL_PAD, y + DEL_PAD, DEL_SIZE);
+        drawDeleteIcon(ctx, x + w - DEL_PAD - DEL_SIZE, y + DEL_PAD, DEL_SIZE);
+
+        if (selected) {
+            drawHandles(ctx, x, y, w, h);
+        }
+    }
+}
+
+function drawHandles(ctx, x, y, w, h) {
+    const r = 5;
+    const pts = handlePoints(x, y, w, h);
+    ctx.save();
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 2;
+    for (const p of pts) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+function handlePoints(x, y, w, h) {
+    const cx = x + w / 2, cy = y + h / 2;
+    return [
+        { x, y },
+        { x: cx, y },
+        { x: x + w, y },
+        { x: x + w, y: cy },
+        { x: x + w, y: y + h },
+        { x: cx, y: y + h },
+        { x, y: y + h },
+        { x, y: cy }
+    ];
+}
+
+/* -------------------- INTERACTION (mouse) -------------------- */
+
+function initBboxInteraction() {
+    const canvas = document.getElementById("bboxCanvas");
+    const img = document.getElementById("previewImage");
+    if (!canvas || !img) return;
+
+    const posFromEvent = ev => {
+        const rect = canvas.getBoundingClientRect();
+        const sx = canvas.width / rect.width;
+        const sy = canvas.height / rect.height;
+        return {
+            x: (ev.clientX - rect.left) * sx,
+            y: (ev.clientY - rect.top) * sy
+        };
+    };
+
+    let startPt = null;
+    let startBox = null;
+
+    canvas.addEventListener("mousedown", ev => {
+        const pt = posFromEvent(ev);
+        const W = canvas.width, H = canvas.height;
+
+        if (createMode) {
+            drawStartPt = pt;
+            drawPreview = { x: pt.x, y: pt.y, w: 0, h: 0 };
+            dragMode = "drawing";
+            return;
+        }
+
+        for (let i = labels.length - 1; i >= 0; i--) {
+            const b = getBoxPx(labels[i], W, H);
+            if (isInsideDeleteIcon(pt.x, pt.y, b.x, b.y, b.w, b.h)) {
+                labels.splice(i, 1);
+                if (selectedId !== null) {
+                    if (selectedId === i) selectedId = null;
+                    else if (selectedId > i) selectedId -= 1;
+                }
+                refreshUI("Label deleted.");
+                return;
+            }
+        }
+
+        const h = hitTestHandle(pt, labels, W, H);
+        if (h) {
+            selectedId = h.id;
+            activeHandle = h.handle;
+            dragMode = "resize";
+            startPt = pt;
+            startBox = getBoxPx(labels[selectedId], W, H);
+            drawBBoxes(img, canvas, labels);
+            renderLabelsList();
+            return;
+        }
+
+        const id = hitTestBox(pt, labels, W, H);
+        if (id !== null) {
+            selectedId = id;
+            activeHandle = -1;
+            dragMode = "move";
+            startPt = pt;
+            startBox = getBoxPx(labels[selectedId], W, H);
+            drawBBoxes(img, canvas, labels);
+            renderLabelsList();
+            return;
+        }
+
+        selectedId = null;
+        dragMode = "idle";
+        activeHandle = -1;
+        drawBBoxes(img, canvas, labels);
+        renderLabelsList();
+    });
+
+    canvas.addEventListener("mousemove", ev => {
+        const pt = posFromEvent(ev);
+        const W = canvas.width, H = canvas.height;
+
+        if (dragMode === "drawing" && drawStartPt) {
+            const x0 = Math.min(drawStartPt.x, pt.x);
+            const y0 = Math.min(drawStartPt.y, pt.y);
+            const w = Math.abs(pt.x - drawStartPt.x);
+            const h = Math.abs(pt.y - drawStartPt.y);
+            drawPreview = { x: x0, y: y0, w, h };
+            drawBBoxes(img, canvas, labels);
+            const ctx = canvas.getContext("2d");
+            ctx.save();
+            ctx.strokeStyle = "red";
+            ctx.fillStyle = "rgba(255,0,0,0.12)";
+            ctx.lineWidth = 2;
+            ctx.fillRect(x0, y0, w, h);
+            ctx.strokeRect(x0, y0, w, h);
+            ctx.restore();
+            return;
+        }
+
+        if (dragMode === "idle" || selectedId === null) return;
+
+        const lab = labels[selectedId];
+        if (dragMode === "move") {
+            const dx = pt.x - startPt.x;
+            const dy = pt.y - startPt.y;
+            let x = startBox.x + dx;
+            let y = startBox.y + dy;
+            x = Math.max(0, Math.min(W - startBox.w, x));
+            y = Math.max(0, Math.min(H - startBox.h, y));
+            lab.x_center = (x + startBox.w / 2) / W;
+            lab.y_center = (y + startBox.h / 2) / H;
+        } else if (dragMode === "resize") {
+            const nb = resizeFromHandle(activeHandle, startBox, startPt, pt);
+            nb.w = Math.max(2, Math.min(W, nb.w));
+            nb.h = Math.max(2, Math.min(H, nb.h));
+            nb.x = Math.max(0, Math.min(W - nb.w, nb.x));
+            nb.y = Math.max(0, Math.min(H - nb.h, nb.y));
+            lab.x_center = (nb.x + nb.w / 2) / W;
+            lab.y_center = (nb.y + nb.h / 2) / H;
+            lab.width = nb.w / W;
+            lab.height = nb.h / H;
+        }
+
+        drawBBoxes(img, canvas, labels);
+    });
+
+    const endDrag = () => {
+        if (dragMode === "drawing" && drawPreview && drawPreview.w >= 2 && drawPreview.h >= 2) {
+            const W = canvas.width, H = canvas.height;
+            const nb = drawPreview;
+            labels.push({
+                cls: 0,
+                x_center: (nb.x + nb.w / 2) / W,
+                y_center: (nb.y + nb.h / 2) / H,
+                width: nb.w / W,
+                height: nb.h / H
+            });
+            selectedId = labels.length - 1;
+            drawBBoxes(img, canvas, labels);
+            renderLabelsList();
+            document.getElementById("numLabels").textContent = labels.length;
+            setStatus("New label added.");
+        }
+
+        dragMode = "idle";
+        activeHandle = -1;
+        drawStartPt = null;
+        drawPreview = null;
+        createMode = false;
+    };
+
+    canvas.addEventListener("mouseup", endDrag);
+    canvas.addEventListener("mouseleave", endDrag);
+}
+
+function getBoxPx(lab, W, H) {
+    const w = lab.width * W;
+    const h = lab.height * H;
+    const x = lab.x_center * W - w / 2;
+    const y = lab.y_center * H - h / 2;
+    return { x, y, w, h };
+}
+
+function hitTestBox(pt, labs, W, H) {
+    for (let i = labs.length - 1; i >= 0; i--) {
+        const b = getBoxPx(labs[i], W, H);
+        if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) {
+            return i;
+        }
+    }
+    return null;
+}
+
+function hitTestHandle(pt, labs, W, H) {
+    const r = 7;
+    for (let i = labs.length - 1; i >= 0; i--) {
+        const b = getBoxPx(labs[i], W, H);
+        const pts = handlePoints(b.x, b.y, b.w, b.h);
+        for (let h = 0; h < pts.length; h++) {
+            const p = pts[h];
+            const dx = pt.x - p.x;
+            const dy = pt.y - p.y;
+            if (dx * dx + dy * dy <= r * r) return { id: i, handle: h };
+        }
+    }
+    return null;
+}
+
+function resizeFromHandle(handle, startBox, startPt, curPt) {
+    let { x, y, w, h } = startBox;
+    const dx = curPt.x - startPt.x;
+    const dy = curPt.y - startPt.y;
+
+    switch (handle) {
+        case 0:
+            x += dx; y += dy; w -= dx; h -= dy; break;
+        case 1:
+            y += dy; h -= dy; break;
+        case 2:
+            y += dy; w += dx; h -= dy; break;
+        case 3:
+            w += dx; break;
+        case 4:
+            w += dx; h += dy; break;
+        case 5:
+            h += dy; break;
+        case 6:
+            x += dx; w -= dx; h += dy; break;
+        case 7:
+            x += dx; w -= dx; break;
+    }
+
+    return { x, y, w, h };
+}
+
+/* -------------------- LABEL LIST + ZOOM -------------------- */
+
+function refreshUI(status) {
+    const img = document.getElementById("previewImage");
+    const canvas = document.getElementById("bboxCanvas");
+    drawBBoxes(img, canvas, labels);
+    renderLabelsList();
+    document.getElementById("numLabels").textContent = labels.length;
+    if (status) {
+        setStatus(status);
+    }
+}
+
+function renderLabelsList() {
+    const container = document.getElementById("labelsList");
+    container.innerHTML = "";
+
+    if (!labels || labels.length === 0) {
+        container.textContent = "(no labels)";
+        return;
+    }
+
+    labels.forEach((lab, i) => {
+        const row = document.createElement("div");
+        row.classList.add("label-row");
+        row.dataset.id = i;
+
+        const idx = document.createElement("button");
+        idx.textContent = `#${i}`;
+        idx.classList.add("mini-btn");
+        idx.style.fontWeight = "bold";
+        idx.onclick = (e) => {
+            e.stopPropagation();
+            selectedId = i;
+            drawBBoxes(
+                document.getElementById("previewImage"),
+                document.getElementById("bboxCanvas"),
+                labels
+            );
+            renderLabelsList();
+        };
+        row.appendChild(idx);
+
+        const clsLabel = document.createElement("span");
+        clsLabel.textContent = "cls:";
+        row.appendChild(clsLabel);
+
+        const clsInput = document.createElement("input");
+        clsInput.type = "number";
+        clsInput.min = "0";
+        clsInput.max = "10";
+        clsInput.step = "1";
+        clsInput.value = lab.cls ?? 0;
+        clsInput.style.width = "3.5em";
+
+        clsInput.addEventListener("change", (e) => {
+            const newVal = parseInt(e.target.value, 10);
+            lab.cls = isNaN(newVal) ? 0 : newVal;
+            drawBBoxes(
+                document.getElementById("previewImage"),
+                document.getElementById("bboxCanvas"),
+                labels
+            );
+        });
+
+        row.appendChild(clsInput);
+
+        container.appendChild(row);
+    });
+}
+
+function initZoom() {
+    const range = document.getElementById("zoomRange");
+    const pctEl = document.getElementById("zoomPct");
+    const stage = document.getElementById("imageArea");
+    if (!range || !pctEl || !stage) return;
+
+    const apply = val => {
+        const scale = val / 100;
+        stage.style.transform = `scale(${scale})`;
+        pctEl.textContent = `${val}%`;
+    };
+
+    range.addEventListener("input", e => apply(e.target.value));
+    apply(range.value);
+}

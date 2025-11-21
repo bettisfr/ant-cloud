@@ -1,0 +1,81 @@
+body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: space-between;
+    font-family: Arial, sans-serif;
+    height: 100vh;
+}
+
+/* ====== VIEWER ====== */
+#viewer {
+    flex: 1;
+    overflow: auto;
+    background: #fff;
+}
+
+#imageArea {
+    position: relative;
+    transform-origin: top left;
+}
+
+#previewImage {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+#bboxCanvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: auto;
+}
+
+/* ====== SIDEBAR ====== */
+#sidebar {
+    width: 22%;
+    min-width: 280px;
+    height: 100vh;
+    padding: 14px;
+    overflow-y: auto;
+    background-color: #f4f4f4;
+    border-left: 2px solid #ddd;
+    box-sizing: border-box;
+}
+
+/* ====== DISABLED STATE ====== */
+.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* ====== BUTTONS ====== */
+button.option-button {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button.option-button:hover {
+    background-color: #0056b3;
+}
+
+.label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.mini-btn {
+    font-size: 0.8em;
+    padding: 2px 6px;
+}
