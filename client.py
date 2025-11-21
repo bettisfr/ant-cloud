@@ -20,7 +20,7 @@ logging.basicConfig(
 )
 
 # Directory where images are stored
-# IMPORTANT: same as UPLOAD_FOLDER in server.py
+# IMPORTANT: same as UPLOAD_FOLDER in server-picture.py
 IMAGE_DIR = "static/uploads"
 os.makedirs(IMAGE_DIR, exist_ok=True)
 

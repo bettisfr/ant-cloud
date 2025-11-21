@@ -47,7 +47,7 @@ Replace `<server-ip>` with the actual IP address or hostname of the server.
 
 ```bash
 pip install -r requirements.txt
-python server.py
+python server-picture.py
 ```
 
 ### 🍓 Raspberry Pi Client Setup
