@@ -45,9 +45,9 @@ def extract_metadata(image_path):
         for line in user_comment.splitlines():
             if "=" in line:
                 no_space_line = line.replace(" ", "")
-                splitted = no_space_line.split("|")
-                for i in range(len(splitted)):
-                    key, value = splitted[i].split("=")
+                split = no_space_line.split("|")
+                for i in range(len(split)):
+                    key, value = split[i].split("=")
                     metadata[key] = value
 
 
