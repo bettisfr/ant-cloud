@@ -6,28 +6,16 @@ function loadGalleryImages() {
     fetch('/get-images')
         .then(response => response.json())
         .then(images => {
-            gallery.innerHTML = "";
+            console.log("Fetched images:", images); // Debugging
 
-            let currentDate = null;
+            gallery.innerHTML = ""; // Clear gallery before adding new images
 
             images.forEach(imageData => {
-                const imgDate = imageData.upload_time.split(" ")[0]; // YYYY-MM-DD
-
-                if (imgDate !== currentDate) {
-                    currentDate = imgDate;
-
-                    const header = document.createElement("h3");
-                    header.textContent = currentDate;
-                    header.classList.add("gallery-date-header");
-                    gallery.appendChild(header);
-                }
-
-                addImageToGallery(imageData, false);
+                addImageToGallery(imageData, false); // Add image without real-time effect
             });
         })
-        .catch(console.error);
+        .catch(error => console.error('Error fetching images:', error));
 }
-
 
 // Add an image to the gallery with optional real-time effect
 function addImageToGallery(imageData, isRealTime = true) {
@@ -110,22 +98,13 @@ function addImageToGallery(imageData, isRealTime = true) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const rangeBtn = document.getElementById("downloadRangeBtn");
-    if (rangeBtn) {
-        rangeBtn.addEventListener("click", () => {
-            const from = document.getElementById("dateFrom").value;
-            const to   = document.getElementById("dateTo").value;
-
-            if (!from || !to) {
-                alert("Please select both dates.");
-                return;
-            }
-
-            const url = `/download-dataset-range?from=${from}&to=${to}`;
-            window.location.href = url;
+    const btn = document.getElementById('downloadDatasetBtn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            // simplest: just navigate to the route, browser downloads the zip
+            window.location.href = '/download-dataset';
         });
     }
-
 });
 
 // Lazy loading for images (loads only when they are near the viewport)

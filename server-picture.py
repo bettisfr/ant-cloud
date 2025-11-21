@@ -6,8 +6,6 @@ import zipfile
 from werkzeug.utils import secure_filename
 import time
 import piexif
-from datetime import datetime
-
 
 app = Flask(__name__)
 socketio = SocketIO(app, async_mode='eventlet')
@@ -193,43 +191,39 @@ def delete_image():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/download-dataset-range')
-def download_dataset_range():
-    date_from = request.args.get('from')
-    date_to = request.args.get('to')
+@app.route('/download-dataset')
+def download_dataset():
+    """
+    Create a zip on the fly containing:
+      - static/uploads/**  -> inside zip as uploads/...
+      - static/labels/**   -> inside zip as labels/...
+    """
+    memory_file = io.BytesIO()
 
-    if not date_from or not date_to:
-        return "Missing date range", 400
+    with zipfile.ZipFile(memory_file, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+        # Add uploads
+        for root, dirs, files in os.walk(UPLOAD_FOLDER):
+            for fname in files:
+                full_path = os.path.join(root, fname)
+                rel_path = os.path.relpath(full_path, UPLOAD_FOLDER)
+                arcname = os.path.join('uploads', rel_path)
+                zf.write(full_path, arcname)
 
-    dt_from = datetime.strptime(date_from, "%Y-%m-%d")
-    dt_to   = datetime.strptime(date_to, "%Y-%m-%d")
+        # Add labels
+        for root, dirs, files in os.walk(LABELS_FOLDER):
+            for fname in files:
+                full_path = os.path.join(root, fname)
+                rel_path = os.path.relpath(full_path, LABELS_FOLDER)
+                arcname = os.path.join('labels', rel_path)
+                zf.write(full_path, arcname)
 
-    images = get_sorted_images(UPLOAD_FOLDER)
+    memory_file.seek(0)
 
-    selected = []
-    for img in images:
-        ts = datetime.strptime(img["upload_time"], "%Y-%m-%d %H:%M:%S")
-        if dt_from <= ts.date() <= dt_to.date():
-            selected.append(img["filename"])
-
-    # Create ZIP in memory
-    mem = io.BytesIO()
-    with zipfile.ZipFile(mem, 'w', zipfile.ZIP_DEFLATED) as z:
-        for filename in selected:
-            img_path = os.path.join(UPLOAD_FOLDER, filename)
-            if os.path.exists(img_path):
-                z.write(img_path, f"uploads/{filename}")
-
-            txt_path = os.path.join("static/labels", filename.replace(".jpg", ".txt"))
-            if os.path.exists(txt_path):
-                z.write(txt_path, f"labels/{os.path.basename(txt_path)}")
-
-    mem.seek(0)
     return send_file(
-        mem,
-        mimetype="application/zip",
+        memory_file,
+        mimetype='application/zip',
         as_attachment=True,
-        download_name=f"dataset_{date_from}_to_{date_to}.zip"
+        download_name='antpi_dataset.zip'
     )
 
 

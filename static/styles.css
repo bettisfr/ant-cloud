@@ -103,14 +103,3 @@ footer {
 .img-delete-btn:hover {
     background-color: rgba(200, 35, 51, 1);
 }
-
-.gallery-date-header {
-    width: 100%;
-    margin-top: 20px;
-    margin-bottom: 10px;
-    font-weight: 600;
-    font-size: 1.4em;
-    border-bottom: 1px solid #ccc;
-    padding-bottom: 4px;
-}
-
