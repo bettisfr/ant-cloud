@@ -11,10 +11,6 @@ os.makedirs(LABELS_DIR, exist_ok=True)
 
 @app.route("/label")
 def label_page():
-    """
-    Example:
-    /label?image=img_20250523-160427.jpg
-    """
     image_name = request.args.get("image")
     if not image_name:
         return "Missing 'image' parameter", 400
@@ -23,17 +19,6 @@ def label_page():
 
 @app.route("/save_labels", methods=["POST"])
 def save_labels():
-    """
-    Expects JSON:
-    {
-        "image": "img_20250523-160427.jpg",
-        "labels": [
-            {"cls": 0, "x_center": 0.5, "y_center": 0.5, "width": 0.2, "height": 0.1},
-            ...
-        ]
-    }
-    Writes: static/labels/img_20250523-160427.txt
-    """
     data = request.get_json(silent=True) or {}
     image_name = data.get("image")
     labels = data.get("labels", [])
