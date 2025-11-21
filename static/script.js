@@ -27,11 +27,20 @@ function addImageToGallery(imageData, isRealTime = true) {
     // Image element with lazy loading
     const img = document.createElement('img');
     img.classList.add('image-gallery-img');
-    img.dataset.src = `/static/uploads/${imageData.filename}`; // Lazy load source
+    img.dataset.src = `/static/uploads/${imageData.filename}`;
     img.alt = imageData.filename;
-    img.style.visibility = 'hidden'; // Hide until loaded
+    img.style.visibility = 'hidden';
 
-    // Metadata section
+    // When clicking the image (or the whole div), open labeler
+    const host = window.location.hostname;
+    const labelerUrl = `http://${host}:5001/label?image=${encodeURIComponent(imageData.filename)}`;
+
+    // Make it obvious it's clickable
+    div.style.cursor = 'pointer';
+    div.addEventListener('click', () => {
+        window.open(labelerUrl, '_blank'); // open in a new tab
+    });
+
     const metadataDiv = document.createElement('div');
     metadataDiv.classList.add('image-metadata');
     metadataDiv.innerHTML = `
@@ -47,13 +56,14 @@ function addImageToGallery(imageData, isRealTime = true) {
     div.appendChild(metadataDiv);
 
     if (isRealTime) {
-        gallery.prepend(div);  // Add new images to the top
+        gallery.prepend(div);
     } else {
-        gallery.appendChild(div); // Add fetched images to the end
+        gallery.appendChild(div);
     }
 
     lazyLoadImage(img);
 }
+
 
 // Lazy loading for images (loads only when they are near the viewport)
 function lazyLoadImage(img) {
