@@ -12,6 +12,8 @@ socketio = SocketIO(app, async_mode='eventlet')
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+LABELS_FOLDER = 'static/labels'
+os.makedirs(LABELS_FOLDER, exist_ok=True)
 
 
 def to_gps_decimal(gps_data, ref):
@@ -81,10 +83,21 @@ def get_sorted_images(image_folder):
         metadata = extract_metadata(file_path)
         modification_time = os.path.getmtime(file_path)
 
+        # Count labels, if a corresponding .txt exists
+        base_name, _ = os.path.splitext(image)
+        labels_path = os.path.join(LABELS_FOLDER, base_name + ".txt")
+        labels_count = 0
+        if os.path.exists(labels_path):
+            with open(labels_path, "r") as lf:
+                for line in lf:
+                    if line.strip():
+                        labels_count += 1
+
         image_files_with_metadata.append({
             "filename": image,
-            "upload_time": modification_time,  # Store as a timestamp for sorting
-            "metadata": metadata
+            "upload_time": modification_time,  # timestamp for sorting
+            "metadata": metadata,
+            "labels_count": labels_count
         })
 
     sorted_images = sorted(image_files_with_metadata, key=lambda x: x["upload_time"], reverse=True)

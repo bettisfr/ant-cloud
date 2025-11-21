@@ -49,8 +49,10 @@ function addImageToGallery(imageData, isRealTime = true) {
         Pressure: ${imageData.metadata?.pressure ?? 'N/A'} hPa<br>
         Humidity: ${imageData.metadata?.humidity ?? 'N/A'} %<br>
         GPS: (${imageData.metadata?.latitude ?? 'N/A'}, ${imageData.metadata?.longitude ?? 'N/A'})<br>
+        Labels: ${imageData.labels_count ?? 0}<br>
         ${isRealTime ? '<em>Uploaded just now</em>' : ''}
     `;
+
 
     div.appendChild(img);
     div.appendChild(metadataDiv);
