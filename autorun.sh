@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Activate virtual environment
-source antenv/bin/activate
+source ~/antenv/bin/activate
 
 # Move into the project
-cd ant-cloud || exit
+cd ~/ant-cloud || exit
 
 echo "Starting Ant Cloud servers..."
 
