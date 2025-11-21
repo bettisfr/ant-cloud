@@ -29,12 +29,26 @@
 
 <!-- Gallery Section -->
 <div class="container my-5">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 class="section-title mb-0">Image Gallery</h1>
-        <button id="downloadDatasetBtn" class="btn btn-primary">
-            Download dataset (zip)
-        </button>
-    </div>
+    <div class="container my-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label for="dateFrom" class="form-label">From</label>
+                <input type="date" id="dateFrom" class="form-control">
+            </div>
+
+            <div class="col-auto">
+                <label for="dateTo" class="form-label">To</label>
+                <input type="date" id="dateTo" class="form-control">
+            </div>
+
+            <div class="col-auto">
+                <button id="downloadRangeBtn" class="btn btn-primary">
+                    Download range (ZIP)
+                </button>
+            </div>
+        </div>
+</div>
+
 
     <!-- Single gallery container -->
     <div id="gallery" class="row g-4 justify-content-center"></div>
