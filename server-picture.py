@@ -1,6 +1,8 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, send_file
 from flask_socketio import SocketIO
 import os
+import io
+import zipfile
 from werkzeug.utils import secure_filename
 import time
 import piexif
@@ -188,6 +190,42 @@ def delete_image():
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/download-dataset')
+def download_dataset():
+    """
+    Create a zip on the fly containing:
+      - static/uploads/**  -> inside zip as uploads/...
+      - static/labels/**   -> inside zip as labels/...
+    """
+    memory_file = io.BytesIO()
+
+    with zipfile.ZipFile(memory_file, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+        # Add uploads
+        for root, dirs, files in os.walk(UPLOAD_FOLDER):
+            for fname in files:
+                full_path = os.path.join(root, fname)
+                rel_path = os.path.relpath(full_path, UPLOAD_FOLDER)
+                arcname = os.path.join('uploads', rel_path)
+                zf.write(full_path, arcname)
+
+        # Add labels
+        for root, dirs, files in os.walk(LABELS_FOLDER):
+            for fname in files:
+                full_path = os.path.join(root, fname)
+                rel_path = os.path.relpath(full_path, LABELS_FOLDER)
+                arcname = os.path.join('labels', rel_path)
+                zf.write(full_path, arcname)
+
+    memory_file.seek(0)
+
+    return send_file(
+        memory_file,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name='antpi_dataset.zip'
+    )
+
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000, debug=True)

@@ -97,7 +97,15 @@ function addImageToGallery(imageData, isRealTime = true) {
     lazyLoadImage(img);
 }
 
-
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('downloadDatasetBtn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            // simplest: just navigate to the route, browser downloads the zip
+            window.location.href = '/download-dataset';
+        });
+    }
+});
 
 // Lazy loading for images (loads only when they are near the viewport)
 function lazyLoadImage(img) {
