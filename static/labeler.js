@@ -20,6 +20,15 @@ const CLASS_MAP = {
     5: "Colobopsis truncata"
 };
 
+const CLASS_COLOR = {
+    0: "#e6194B",  // Camponotus vagus – red
+    1: "#3cb44b",  // Plagiolepis pygmaea – green
+    2: "#ffe119",  // Crematogaster scutellaris – yellow
+    3: "#4363d8",  // Temnothorax spp – blue
+    4: "#f58231",  // Dolichoderus quadripunctatus – orange
+    5: "#911eb4"   // Colobopsis truncata – purple
+};
+
 
 document.addEventListener("DOMContentLoaded", () => {
     initBboxInteraction();
@@ -144,14 +153,16 @@ function drawDeleteIcon(ctx, x, y, size = DEL_SIZE) {
     ctx.restore();
 }
 
-function drawClassIcon(ctx, text, x, y, size = DEL_SIZE) {
-    const r = 3;
+function drawClassIcon(ctx, text, x, y, size, color="black") {
+    const r = 3;   // corner radius
     ctx.save();
 
-    ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 1;
+    // background
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
 
+    // square shape
     const w = size;
     const h = size;
 
@@ -166,17 +177,20 @@ function drawClassIcon(ctx, text, x, y, size = DEL_SIZE) {
     ctx.lineTo(x, y + r);
     ctx.quadraticCurveTo(x, y, x + r, y);
     ctx.closePath();
+
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = "black";
-    ctx.font = `${size * 0.6}px sans-serif`;
+    // text
+    ctx.fillStyle = color;
+    ctx.font = `${size * 0.55}px sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(String(text), x + w / 2, y + h / 2);
 
     ctx.restore();
 }
+
 
 function isInsideDeleteIcon(px, py, boxX, boxY, boxW, boxH) {
     const ix = boxX + boxW - DEL_PAD - DEL_SIZE;
@@ -280,8 +294,16 @@ function drawBBoxes(imgEl, canvasEl, labs) {
 
         const selected = (i === selectedId);
         ctx.lineWidth = selected ? 3 : 2;
-        ctx.strokeStyle = "red";
-        ctx.fillStyle = "rgba(255,0,0,0.12)";
+
+        // choose color based on class
+        const col = CLASS_COLOR[lab.cls] || "#ff0000";
+
+        // stroke
+        ctx.strokeStyle = col;
+
+        // transparent fill (20%)
+        ctx.fillStyle = hexToRGBA(col, 0.20);
+
         ctx.fillRect(x, y, w, h);
         ctx.strokeRect(x, y, w, h);
 
@@ -296,6 +318,14 @@ function drawBBoxes(imgEl, canvasEl, labs) {
         }
     }
 }
+
+function hexToRGBA(hex, alpha) {
+    const r = parseInt(hex.slice(1,3), 16);
+    const g = parseInt(hex.slice(3,5), 16);
+    const b = parseInt(hex.slice(5,7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
 
 function drawHandles(ctx, x, y, w, h) {
     const r = 5;
