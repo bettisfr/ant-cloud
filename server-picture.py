@@ -153,5 +153,41 @@ def get_images():
     return jsonify(get_sorted_images(UPLOAD_FOLDER))
 
 
+@app.route('/delete-image', methods=['POST'])
+def delete_image():
+    data = request.get_json(silent=True) or {}
+    filename = data.get('filename')
+
+    if not filename:
+        return jsonify({"status": "error", "message": "filename missing"}), 400
+
+    img_path = os.path.join(UPLOAD_FOLDER, filename)
+    base, _ = os.path.splitext(filename)
+    labels_path = os.path.join(LABELS_FOLDER, base + ".txt")
+
+    removed = {"image": False, "labels": False}
+
+    try:
+        if os.path.exists(img_path):
+            os.remove(img_path)
+            removed["image"] = True
+
+        if os.path.exists(labels_path):
+            os.remove(labels_path)
+            removed["labels"] = True
+
+        status = "success"
+        if not any(removed.values()):
+            status = "not_found"
+        elif not all(removed.values()):
+            status = "partial"
+
+        return jsonify({
+            "status": status,
+            "removed": removed
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000, debug=True)

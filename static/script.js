@@ -22,7 +22,38 @@ function addImageToGallery(imageData, isRealTime = true) {
     console.log("Adding image:", imageData.filename); // Debugging
 
     const div = document.createElement('div');
-    div.classList.add('col');
+    div.classList.add('col', 'gallery-item');   // add gallery-item for CSS positioning
+
+    // ---- delete button (top-right X) ----
+    const deleteBtn = document.createElement('button');
+    deleteBtn.classList.add('img-delete-btn');
+    deleteBtn.textContent = '×';
+
+    // do NOT open labeler when clicking X
+    deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();   // prevent click from bubbling to div
+        const ok = confirm(`Delete image "${imageData.filename}" and its labels?`);
+        if (!ok) return;
+
+        fetch('/delete-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: imageData.filename })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success' || data.status === 'partial') {
+                // remove from DOM
+                div.remove();
+            } else {
+                alert('Delete failed: ' + (data.message || 'unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error('Delete error:', err);
+            alert('Delete failed: ' + err);
+        });
+    });
 
     // Image element with lazy loading
     const img = document.createElement('img');
@@ -35,10 +66,9 @@ function addImageToGallery(imageData, isRealTime = true) {
     const host = window.location.hostname;
     const labelerUrl = `http://${host}:5001/label?image=${encodeURIComponent(imageData.filename)}`;
 
-    // Make it obvious it's clickable
     div.style.cursor = 'pointer';
     div.addEventListener('click', () => {
-        window.open(labelerUrl, '_blank'); // open in a new tab
+        window.open(labelerUrl, '_blank');
     });
 
     const metadataDiv = document.createElement('div');
@@ -53,6 +83,8 @@ function addImageToGallery(imageData, isRealTime = true) {
         ${isRealTime ? '<em>Uploaded just now</em>' : ''}
     `;
 
+    // order: X button on top, then img, then metadata
+    div.appendChild(deleteBtn);
     div.appendChild(img);
     div.appendChild(metadataDiv);
 
@@ -64,6 +96,7 @@ function addImageToGallery(imageData, isRealTime = true) {
 
     lazyLoadImage(img);
 }
+
 
 
 // Lazy loading for images (loads only when they are near the viewport)
