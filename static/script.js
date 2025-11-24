@@ -6,7 +6,12 @@ function loadGalleryImages() {
     fetch('/get-images')
         .then(response => response.json())
         .then(images => {
-            console.log("Fetched images:", images); // Debugging
+            console.log("Fetched images (before sort):", images); // Debugging
+
+            // 🔽 Sort by filename descending (newest first, thanks to the timestamp prefix)
+            images.sort((a, b) => b.filename.localeCompare(a.filename));
+
+            console.log("Fetched images (after sort):", images); // Debugging
 
             gallery.innerHTML = ""; // Clear gallery before adding new images
 
@@ -16,6 +21,7 @@ function loadGalleryImages() {
         })
         .catch(error => console.error('Error fetching images:', error));
 }
+
 
 // Add an image to the gallery with optional real-time effect
 function addImageToGallery(imageData, isRealTime = true) {
@@ -73,14 +79,18 @@ function addImageToGallery(imageData, isRealTime = true) {
 
     const metadataDiv = document.createElement('div');
     metadataDiv.classList.add('image-metadata');
+    // metadataDiv.innerHTML = `
+    //     <strong>${imageData.filename}</strong><br>
+    //     <strong>Labels: ${imageData.labels_count ?? 0}</strong><br>
+    //     Temperature: ${imageData.metadata?.temperature ?? 'N/A'} °C<br>
+    //     Pressure: ${imageData.metadata?.pressure ?? 'N/A'} hPa<br>
+    //     Humidity: ${imageData.metadata?.humidity ?? 'N/A'} %<br>
+    //     GPS: (${imageData.metadata?.latitude ?? 'N/A'}, ${imageData.metadata?.longitude ?? 'N/A'})<br>
+    //     ${isRealTime ? '<em>Uploaded just now</em>' : ''}
+    // `;
     metadataDiv.innerHTML = `
-        <strong>${imageData.filename}</strong><br>
-        <strong>Labels: ${imageData.labels_count ?? 0}</strong><br>
-        Temperature: ${imageData.metadata?.temperature ?? 'N/A'} °C<br>
-        Pressure: ${imageData.metadata?.pressure ?? 'N/A'} hPa<br>
-        Humidity: ${imageData.metadata?.humidity ?? 'N/A'} %<br>
-        GPS: (${imageData.metadata?.latitude ?? 'N/A'}, ${imageData.metadata?.longitude ?? 'N/A'})<br>
-        ${isRealTime ? '<em>Uploaded just now</em>' : ''}
+        ${imageData.filename}
+        (<strong>Labels: ${imageData.labels_count ?? 0}</strong>)
     `;
 
     // order: X button on top, then img, then metadata

@@ -11,6 +11,8 @@ let drawPreview = null;
 const DEL_SIZE = 16;
 const DEL_PAD = 4;
 
+const STATIC_UPLOADS_BASE = "/static/uploads";
+
 // -------------------- CLASS DEFINITIONS --------------------
 // Single source of truth for classes: id, label, color
 const CLASS_DEFS = [
@@ -79,7 +81,7 @@ async function loadServerImage(filename) {
     const img = document.getElementById("previewImage");
     const canvas = document.getElementById("bboxCanvas");
 
-    const imgURL = `/static/uploads/${filename}`;
+    const imgURL = `${STATIC_UPLOADS_BASE}/${filename}`;
 
     img.onload = () => {
         fitCanvasToImage(img, canvas);
@@ -97,7 +99,7 @@ async function loadServerImage(filename) {
     selectedId = null;
 
     const base = filename.replace(/\.[^.]+$/, "");
-    const labelsURL = `/static/uploads/${base}.txt`;
+    const labelsURL = `${STATIC_UPLOADS_BASE}/${base}.txt`;
 
     try {
         const res = await fetch(labelsURL);
@@ -109,7 +111,7 @@ async function loadServerImage(filename) {
         console.warn("Error while fetching labels:", err);
     }
 
-    // 🔴 THIS WAS MISSING: redraw after labels are loaded
+    // redraw after labels are loaded
     drawBBoxes(img, canvas, labels);
 
     renderLabelsList();
@@ -123,7 +125,6 @@ async function loadServerImage(filename) {
 
     setStatus(`Loaded ${filename} (${labels.length} labels)`);
 }
-
 
 /* -------------------- ICONS & STATUS -------------------- */
 

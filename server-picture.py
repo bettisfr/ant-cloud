@@ -37,66 +37,79 @@ def to_gps_decimal(gps_data, ref):
     return -decimal if ref in ["S", "W"] else decimal
 
 
+# def extract_metadata(image_path):
+#     """Extract metadata including temperature, humidity, and GPS from EXIF data."""
+#     try:
+#         exif_dict = piexif.load(image_path)
+#         gps_data = exif_dict.get("GPS", {})
+#
+#         gps_latitude = gps_data.get(piexif.GPSIFD.GPSLatitude)
+#         gps_latitude_ref = gps_data.get(
+#             piexif.GPSIFD.GPSLatitudeRef, b"N"
+#         ).decode(errors="ignore")
+#
+#         gps_longitude = gps_data.get(piexif.GPSIFD.GPSLongitude)
+#         gps_longitude_ref = gps_data.get(
+#             piexif.GPSIFD.GPSLongitudeRef, b"E"
+#         ).decode(errors="ignore")
+#
+#         latitude = (
+#             to_gps_decimal(gps_latitude, gps_latitude_ref) if gps_latitude else None
+#         )
+#         longitude = (
+#             to_gps_decimal(gps_longitude, gps_longitude_ref) if gps_longitude else None
+#         )
+#
+#         user_comment = exif_dict.get("0th", {}).get(
+#             piexif.ImageIFD.ImageDescription, b""
+#         ).decode("utf-8", errors="ignore").strip()
+#
+#         metadata = {}
+#         for line in user_comment.splitlines():
+#             if "=" in line:
+#                 no_space_line = line.replace(" ", "")
+#                 parts = no_space_line.split("|")
+#                 for part in parts:
+#                     if "=" in part:
+#                         key, value = part.split("=", 1)
+#                         metadata[key] = value
+#
+#         temperature = metadata.get("Temperature", "N/A")
+#         pressure = metadata.get("Pressure", "N/A")
+#         humidity = metadata.get("Humidity", "N/A")
+#
+#         def safe_float(v):
+#             try:
+#                 fv = float(v)
+#                 return fv if fv != 0 else None
+#             except Exception:
+#                 return None
+#
+#         return {
+#             "temperature": safe_float(temperature),
+#             "pressure": safe_float(pressure),
+#             "humidity": safe_float(humidity),
+#             "latitude": round(latitude, 6) if latitude not in (None, 0) else None,
+#             "longitude": round(longitude, 6) if longitude not in (None, 0) else None,
+#             "user_comment": user_comment,
+#         }
+#
+#     except Exception as e:
+#         print(f"Error extracting metadata from {image_path}: {e}")
+#         return {}
+
 def extract_metadata(image_path):
-    """Extract metadata including temperature, humidity, and GPS from EXIF data."""
-    try:
-        exif_dict = piexif.load(image_path)
-        gps_data = exif_dict.get("GPS", {})
-
-        gps_latitude = gps_data.get(piexif.GPSIFD.GPSLatitude)
-        gps_latitude_ref = gps_data.get(
-            piexif.GPSIFD.GPSLatitudeRef, b"N"
-        ).decode(errors="ignore")
-
-        gps_longitude = gps_data.get(piexif.GPSIFD.GPSLongitude)
-        gps_longitude_ref = gps_data.get(
-            piexif.GPSIFD.GPSLongitudeRef, b"E"
-        ).decode(errors="ignore")
-
-        latitude = (
-            to_gps_decimal(gps_latitude, gps_latitude_ref) if gps_latitude else None
-        )
-        longitude = (
-            to_gps_decimal(gps_longitude, gps_longitude_ref) if gps_longitude else None
-        )
-
-        user_comment = exif_dict.get("0th", {}).get(
-            piexif.ImageIFD.ImageDescription, b""
-        ).decode("utf-8", errors="ignore").strip()
-
-        metadata = {}
-        for line in user_comment.splitlines():
-            if "=" in line:
-                no_space_line = line.replace(" ", "")
-                parts = no_space_line.split("|")
-                for part in parts:
-                    if "=" in part:
-                        key, value = part.split("=", 1)
-                        metadata[key] = value
-
-        temperature = metadata.get("Temperature", "N/A")
-        pressure = metadata.get("Pressure", "N/A")
-        humidity = metadata.get("Humidity", "N/A")
-
-        def safe_float(v):
-            try:
-                fv = float(v)
-                return fv if fv != 0 else None
-            except Exception:
-                return None
-
-        return {
-            "temperature": safe_float(temperature),
-            "pressure": safe_float(pressure),
-            "humidity": safe_float(humidity),
-            "latitude": round(latitude, 6) if latitude not in (None, 0) else None,
-            "longitude": round(longitude, 6) if longitude not in (None, 0) else None,
-            "user_comment": user_comment,
-        }
-
-    except Exception as e:
-        print(f"Error extracting metadata from {image_path}: {e}")
-        return {}
+    """
+    TEMP: disable EXIF parsing for performance testing.
+    """
+    return {
+        "temperature": None,
+        "pressure": None,
+        "humidity": None,
+        "latitude": None,
+        "longitude": None,
+        "user_comment": "",
+    }
 
 
 # ----------------------------------------------------------------------
@@ -104,10 +117,32 @@ def extract_metadata(image_path):
 # ----------------------------------------------------------------------
 def get_sorted_images(image_folder):
     """
-    Retrieve images and sort them by modification time, plus count labels.
+    Retrieve images and sort them by the timestamp encoded in the filename
+    (e.g., 2023-07-20T20-19-46+0200_...), newest first.
+    If parsing fails, fall back to file modification time.
     Image files: *.jpg, *.jpeg
     Label files: same base name, *.txt in LABELS_FOLDER
     """
+
+    def parse_timestamp_from_filename(filename: str, file_path: str) -> float:
+        """
+        Try to parse the leading timestamp in the filename:
+        2023-07-20T20-19-46+0200_b8-27-eb-3b-8d-1c.jpeg
+
+        Prefix:  %Y-%m-%dT%H-%M-%S%z
+        If anything goes wrong, fall back to os.path.getmtime(file_path).
+        """
+        base_name, _ = os.path.splitext(filename)
+
+        try:
+            # Take the part before the first underscore
+            prefix = base_name.split("_", 1)[0]  # "2023-07-20T20-19-46+0200"
+            dt = datetime.datetime.strptime(prefix, "%Y-%m-%dT%H-%M-%S%z")
+            return dt.timestamp()
+        except Exception:
+            # Fallback: filesystem mtime
+            return os.path.getmtime(file_path)
+
     image_files = [
         f
         for f in os.listdir(image_folder)
@@ -118,8 +153,10 @@ def get_sorted_images(image_folder):
     for image in image_files:
         file_path = os.path.join(image_folder, image)
 
+        # sort key based on filename timestamp (or mtime as fallback)
+        sort_ts = parse_timestamp_from_filename(image, file_path)
+
         metadata = extract_metadata(file_path)
-        modification_time = os.path.getmtime(file_path)
 
         # Count labels, if a corresponding .txt exists
         base_name, _ = os.path.splitext(image)
@@ -134,23 +171,27 @@ def get_sorted_images(image_folder):
         image_files_with_metadata.append(
             {
                 "filename": image,
-                "upload_time": modification_time,  # timestamp for sorting
+                "upload_ts": sort_ts,   # numeric timestamp used for sorting
                 "metadata": metadata,
                 "labels_count": labels_count,
             }
         )
 
+    # Sort by our parsed timestamp (newest first)
     sorted_images = sorted(
-        image_files_with_metadata, key=lambda x: x["upload_time"], reverse=True
+        image_files_with_metadata, key=lambda x: x["upload_ts"], reverse=True
     )
 
-    # Format upload_time as readable string
+    # Add a human-readable upload_time string
     for image in sorted_images:
         image["upload_time"] = time.strftime(
-            "%Y-%m-%d %H:%M:%S", time.localtime(image["upload_time"])
+            "%Y-%m-%d %H:%M:%S", time.localtime(image["upload_ts"])
         )
+        # If you don't want to expose the raw ts to the frontend, you can:
+        # del image["upload_ts"]
 
     return sorted_images
+
 
 
 # ----------------------------------------------------------------------
