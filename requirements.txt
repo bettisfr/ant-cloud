@@ -6,3 +6,6 @@ gpiozero
 psutil
 memory-profiler
 pandas
+flask-socketio
+eventlet
+piexif

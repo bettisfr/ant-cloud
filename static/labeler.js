@@ -1,3 +1,4 @@
+// -------------------- GLOBAL STATE --------------------
 let currentImage = null;      // { name: "img_....jpg" }
 let labels = [];
 let selectedId = null;
@@ -10,26 +11,29 @@ let drawPreview = null;
 const DEL_SIZE = 16;
 const DEL_PAD = 4;
 
-// Hardcoded YOLO class → species name map
-const CLASS_MAP = {
-    0: "Camponotus vagus",
-    1: "Plagiolepis pygmaea",
-    2: "Crematogaster scutellaris",
-    3: "Temnothorax spp.",
-    4: "Dolichoderus quadripunctatus",
-    5: "Colobopsis truncata"
-};
+// -------------------- CLASS DEFINITIONS --------------------
+// Single source of truth for classes: id, label, color
+const CLASS_DEFS = [
+    { id: 0, label: "Camponotus vagus",              color: "#e6194B" }, // red
+    { id: 1, label: "Plagiolepis pygmaea",           color: "#3cb44b" }, // green
+    { id: 2, label: "Crematogaster scutellaris",     color: "#ffe119" }, // yellow
+    { id: 3, label: "Temnothorax spp.",              color: "#4363d8" }, // blue
+    { id: 4, label: "Dolichoderus quadripunctatus",  color: "#f58231" }, // orange
+    { id: 5, label: "Colobopsis truncata",           color: "#911eb4" }  // purple
+];
 
-const CLASS_COLOR = {
-    0: "#e6194B",  // Camponotus vagus – red
-    1: "#3cb44b",  // Plagiolepis pygmaea – green
-    2: "#ffe119",  // Crematogaster scutellaris – yellow
-    3: "#4363d8",  // Temnothorax spp – blue
-    4: "#f58231",  // Dolichoderus quadripunctatus – orange
-    5: "#911eb4"   // Colobopsis truncata – purple
-};
+// Derived maps for quick lookup
+const CLASS_MAP = CLASS_DEFS.reduce((acc, c) => {
+    acc[c.id] = c.label;
+    return acc;
+}, {});
 
+const CLASS_COLOR = CLASS_DEFS.reduce((acc, c) => {
+    acc[c.id] = c.color;
+    return acc;
+}, {});
 
+// -------------------- INIT --------------------
 document.addEventListener("DOMContentLoaded", () => {
     initBboxInteraction();
     initZoom();
@@ -55,6 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // No file picker, no placeholder: read ?image=... and load server-side image
     initFromQueryParam();
 });
+
 
 /* -------------------- IMAGE LOADING (server-side) -------------------- */
 
@@ -92,7 +97,7 @@ async function loadServerImage(filename) {
     selectedId = null;
 
     const base = filename.replace(/\.[^.]+$/, "");
-    const labelsURL = `/static/labels/${base}.txt`;
+    const labelsURL = `/static/uploads/${base}.txt`;
 
     try {
         const res = await fetch(labelsURL);
@@ -619,14 +624,30 @@ function renderLabelsList() {
         row.appendChild(clsLabel);
 
         const clsInput = document.createElement("select");
+        clsInput.style.width = "100%";   // give it room for full species name
 
-        for (const [id, species] of Object.entries(CLASS_MAP)) {
+        CLASS_DEFS.forEach(c => {
             const opt = document.createElement("option");
-            opt.value = id;
-            opt.textContent = species;
-            if (parseInt(id) === lab.cls) opt.selected = true;
+            opt.value = String(c.id);
+            opt.textContent = c.label;
+            if (c.id === lab.cls) {
+                opt.selected = true;
+            }
             clsInput.appendChild(opt);
-        }
+        });
+
+        clsInput.addEventListener("change", (e) => {
+            const newVal = parseInt(e.target.value, 10);
+            lab.cls = isNaN(newVal) ? 0 : newVal;
+
+            drawBBoxes(
+                document.getElementById("previewImage"),
+                document.getElementById("bboxCanvas"),
+                labels
+            );
+            renderLabelsList();
+        });
+
 
         clsInput.style.width = "3.5em";
 
