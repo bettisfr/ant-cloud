@@ -21,16 +21,16 @@ let CLASS_DEFS;
 
 if (APP === 0) {
     CLASS_DEFS = [
-        { id: 0, label: "Halyomorpha halys", color: "#e6194B" } // red
+        {id: 0, label: "Halyomorpha halys", color: "#e6194B"} // red
     ];
 } else {
     CLASS_DEFS = [
-        { id: 0, label: "Camponotus vagus",              color: "#e6194B" }, // red
-        { id: 1, label: "Plagiolepis pygmaea",           color: "#3cb44b" }, // green
-        { id: 2, label: "Crematogaster scutellaris",     color: "#ffe119" }, // yellow
-        { id: 3, label: "Temnothorax spp.",              color: "#4363d8" }, // blue
-        { id: 4, label: "Dolichoderus quadripunctatus",  color: "#f58231" }, // orange
-        { id: 5, label: "Colobopsis truncata",           color: "#911eb4" }  // purple
+        {id: 0, label: "Camponotus vagus", color: "#e6194B"}, // red
+        {id: 1, label: "Plagiolepis pygmaea", color: "#3cb44b"}, // green
+        {id: 2, label: "Crematogaster scutellaris", color: "#ffe119"}, // yellow
+        {id: 3, label: "Temnothorax spp.", color: "#4363d8"}, // blue
+        {id: 4, label: "Dolichoderus quadripunctatus", color: "#f58231"}, // orange
+        {id: 5, label: "Colobopsis truncata", color: "#911eb4"}  // purple
     ];
 }
 
@@ -95,7 +95,7 @@ async function loadServerImage(filename) {
 
     img.onload = () => {
         fitCanvasToImage(img, canvas);
-        drawBBoxes(img, canvas, labels);   // first draw (maybe still no labels)
+        drawBBoxes(img, canvas, labels);
     };
 
     img.onerror = () => {
@@ -104,26 +104,32 @@ async function loadServerImage(filename) {
 
     img.src = imgURL;
 
-    currentImage = { name: filename };
+    currentImage = {name: filename};
     labels = [];
     selectedId = null;
 
-    const base = filename.replace(/\.[^.]+$/, "");
-    const labelsURL = `${STATIC_UPLOADS_BASE}/${base}.txt`;
-
+    // --- NEW: load labels (with is_tp) from server ---
     try {
-        const res = await fetch(labelsURL);
+        const res = await fetch(`/get_labels?image=${encodeURIComponent(filename)}`);
         if (res.ok) {
-            const txt = await res.text();
-            labels = parseYoloTxt(txt);
+            const data = await res.json();
+            if (data.status === "success" && Array.isArray(data.labels)) {
+                labels = data.labels.map(l => ({
+                    cls: l.cls ?? 0,
+                    x_center: l.x_center,
+                    y_center: l.y_center,
+                    width: l.width,
+                    height: l.height,
+                    // default: true if missing
+                    is_tp: (l.is_tp !== false),
+                }));
+            }
         }
     } catch (err) {
         console.warn("Error while fetching labels:", err);
     }
 
-    // redraw after labels are loaded
     drawBBoxes(img, canvas, labels);
-
     renderLabelsList();
     document.getElementById("imgName").textContent = filename;
     document.getElementById("numLabels").textContent = labels.length;
@@ -135,6 +141,7 @@ async function loadServerImage(filename) {
 
     setStatus(`Loaded ${filename} (${labels.length} labels)`);
 }
+
 
 /* -------------------- ICONS & STATUS -------------------- */
 
@@ -206,7 +213,7 @@ function drawFpIcon(ctx, x, y, size = DEL_SIZE, color = "black") {
 }
 
 
-function drawClassIcon(ctx, text, x, y, size, color="black") {
+function drawClassIcon(ctx, text, x, y, size, color = "black") {
     const r = 3;   // corner radius
     ctx.save();
 
@@ -303,14 +310,14 @@ async function saveLabels() {
                 y_center: l.y_center,
                 width: l.width,
                 height: l.height,
-                // normalize property for the server:
-                is_fp: !!(l.is_fp || l.isFp)
+                is_tp: (l.is_tp !== false)   // only flag we send
             }))
+
         };
 
         const res = await fetch("/save_labels", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {"Content-Type": "application/json"},
             body: JSON.stringify(payload)
         });
 
@@ -328,7 +335,6 @@ async function saveLabels() {
         setStatus("Save failed: " + (err && err.message ? err.message : err));
     }
 }
-
 
 
 /* -------------------- CANVAS & DRAWING -------------------- */
@@ -383,13 +389,14 @@ function drawBBoxes(imgEl, canvasEl, labs) {
         // delete icon (top-right)
         drawDeleteIcon(ctx, x + w - DEL_PAD - DEL_SIZE, y + DEL_PAD, DEL_SIZE);
 
-        // FP icon (bottom-right)
-        // if lab.isFp is true, use same box color; otherwise a neutral dark
-        const fpColor = lab.isFp ? col : "#333333";
+        const isTp = (lab.is_tp !== false);   // default true
+
+        // FP icon (bottom-right): colored if NOT TP
+        const fpColor = isTp ? "#333333" : col;
         drawFpIcon(ctx, x + w - DEL_PAD - DEL_SIZE, y + h - DEL_PAD - DEL_SIZE, DEL_SIZE, fpColor);
 
-        // diagonal cross if marked as false negative
-        if (lab.isFp) {
+        // diagonal cross if NOT TP
+        if (!isTp) {
             ctx.save();
             ctx.strokeStyle = col;
             ctx.lineWidth = 2;
@@ -402,6 +409,7 @@ function drawBBoxes(imgEl, canvasEl, labs) {
             ctx.restore();
         }
 
+
         if (selected) {
             drawHandles(ctx, x, y, w, h);
         }
@@ -410,9 +418,9 @@ function drawBBoxes(imgEl, canvasEl, labs) {
 
 
 function hexToRGBA(hex, alpha) {
-    const r = parseInt(hex.slice(1,3), 16);
-    const g = parseInt(hex.slice(3,5), 16);
-    const b = parseInt(hex.slice(5,7), 16);
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r},${g},${b},${alpha})`;
 }
 
@@ -436,14 +444,14 @@ function drawHandles(ctx, x, y, w, h) {
 function handlePoints(x, y, w, h) {
     const cx = x + w / 2, cy = y + h / 2;
     return [
-        { x, y },
-        { x: cx, y },
-        { x: x + w, y },
-        { x: x + w, y: cy },
-        { x: x + w, y: y + h },
-        { x: cx, y: y + h },
-        { x, y: y + h },
-        { x, y: cy }
+        {x, y},
+        {x: cx, y},
+        {x: x + w, y},
+        {x: x + w, y: cy},
+        {x: x + w, y: y + h},
+        {x: cx, y: y + h},
+        {x, y: y + h},
+        {x, y: cy}
     ];
 }
 
@@ -473,7 +481,7 @@ function initBboxInteraction() {
 
         if (createMode) {
             drawStartPt = pt;
-            drawPreview = { x: pt.x, y: pt.y, w: 0, h: 0 };
+            drawPreview = {x: pt.x, y: pt.y, w: 0, h: 0};
             dragMode = "drawing";
             return;
         }
@@ -491,13 +499,15 @@ function initBboxInteraction() {
             }
         }
 
-        // FP icon: toggle false-negative flag
+        // FP icon: toggle TP/FP flag (stored as is_tp)
         for (let i = labels.length - 1; i >= 0; i--) {
             const b = getBoxPx(labels[i], W, H);
             if (isInsideFpIcon(pt.x, pt.y, b.x, b.y, b.w, b.h)) {
                 const lab = labels[i];
-                lab.isFp = !lab.isFp;
-                refreshUI(lab.isFp ? "Marked as false negative." : "Unmarked false negative.");
+                const curTp = (lab.is_tp !== false);
+                const nextTp = !curTp;       // click → flip
+                lab.is_tp = nextTp;
+                refreshUI(nextTp ? "Marked as true positive." : "Marked as false positive.");
                 return;
             }
         }
@@ -543,7 +553,7 @@ function initBboxInteraction() {
             const y0 = Math.min(drawStartPt.y, pt.y);
             const w = Math.abs(pt.x - drawStartPt.x);
             const h = Math.abs(pt.y - drawStartPt.y);
-            drawPreview = { x: x0, y: y0, w, h };
+            drawPreview = {x: x0, y: y0, w, h};
             drawBBoxes(img, canvas, labels);
             const ctx = canvas.getContext("2d");
             ctx.save();
@@ -593,8 +603,9 @@ function initBboxInteraction() {
                 y_center: (nb.y + nb.h / 2) / H,
                 width: nb.w / W,
                 height: nb.h / H,
-                is_fp: false    // new box is TP by default
+                is_tp: true     // new boxes are TP by default
             });
+
 
             selectedId = labels.length - 1;
             drawBBoxes(img, canvas, labels);
@@ -619,7 +630,7 @@ function getBoxPx(lab, W, H) {
     const h = lab.height * H;
     const x = lab.x_center * W - w / 2;
     const y = lab.y_center * H - h / 2;
-    return { x, y, w, h };
+    return {x, y, w, h};
 }
 
 function hitTestBox(pt, labs, W, H) {
@@ -641,37 +652,55 @@ function hitTestHandle(pt, labs, W, H) {
             const p = pts[h];
             const dx = pt.x - p.x;
             const dy = pt.y - p.y;
-            if (dx * dx + dy * dy <= r * r) return { id: i, handle: h };
+            if (dx * dx + dy * dy <= r * r) return {id: i, handle: h};
         }
     }
     return null;
 }
 
 function resizeFromHandle(handle, startBox, startPt, curPt) {
-    let { x, y, w, h } = startBox;
+    let {x, y, w, h} = startBox;
     const dx = curPt.x - startPt.x;
     const dy = curPt.y - startPt.y;
 
     switch (handle) {
         case 0:
-            x += dx; y += dy; w -= dx; h -= dy; break;
+            x += dx;
+            y += dy;
+            w -= dx;
+            h -= dy;
+            break;
         case 1:
-            y += dy; h -= dy; break;
+            y += dy;
+            h -= dy;
+            break;
         case 2:
-            y += dy; w += dx; h -= dy; break;
+            y += dy;
+            w += dx;
+            h -= dy;
+            break;
         case 3:
-            w += dx; break;
+            w += dx;
+            break;
         case 4:
-            w += dx; h += dy; break;
+            w += dx;
+            h += dy;
+            break;
         case 5:
-            h += dy; break;
+            h += dy;
+            break;
         case 6:
-            x += dx; w -= dx; h += dy; break;
+            x += dx;
+            w -= dx;
+            h += dy;
+            break;
         case 7:
-            x += dx; w -= dx; break;
+            x += dx;
+            w -= dx;
+            break;
     }
 
-    return { x, y, w, h };
+    return {x, y, w, h};
 }
 
 /* -------------------- LABEL LIST + ZOOM -------------------- */
@@ -751,16 +780,16 @@ function renderLabelsList() {
         clsInput.style.width = "3.5em";
 
         clsInput.addEventListener("change", (e) => {
-        const newVal = parseInt(e.target.value, 10);
-        lab.cls = newVal;
+            const newVal = parseInt(e.target.value, 10);
+            lab.cls = newVal;
 
-        drawBBoxes(
-            document.getElementById("previewImage"),
-            document.getElementById("bboxCanvas"),
-            labels
-        );
-        renderLabelsList();
-    });
+            drawBBoxes(
+                document.getElementById("previewImage"),
+                document.getElementById("bboxCanvas"),
+                labels
+            );
+            renderLabelsList();
+        });
 
 
         row.appendChild(clsInput);
