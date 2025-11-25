@@ -14,20 +14,25 @@ const DEL_PAD = 4;
 const STATIC_UPLOADS_BASE = "/static/uploads";
 const LABEL_ALPHA = 0.0;   // 0 = fully transparent, 1 = fully opaque
 
-// -------------------- CLASS DEFINITIONS --------------------
-// Single source of truth for classes: id, label, color
-// const CLASS_DEFS = [
-//     { id: 0, label: "Camponotus vagus",              color: "#e6194B" }, // red
-//     { id: 1, label: "Plagiolepis pygmaea",           color: "#3cb44b" }, // green
-//     { id: 2, label: "Crematogaster scutellaris",     color: "#ffe119" }, // yellow
-//     { id: 3, label: "Temnothorax spp.",              color: "#4363d8" }, // blue
-//     { id: 4, label: "Dolichoderus quadripunctatus",  color: "#f58231" }, // orange
-//     { id: 5, label: "Colobopsis truncata",           color: "#911eb4" }  // purple
-// ];
+const APP = 0; // 0 = bugs, 1 = ants
 
-const CLASS_DEFS = [
-    { id: 0, label: "Halyomorpha halys",              color: "#e6194B" }, // red
-];
+// -------------------- CLASS DEFINITIONS --------------------
+let CLASS_DEFS;
+
+if (APP === 0) {
+    CLASS_DEFS = [
+        { id: 0, label: "Halyomorpha halys", color: "#e6194B" } // red
+    ];
+} else {
+    CLASS_DEFS = [
+        { id: 0, label: "Camponotus vagus",              color: "#e6194B" }, // red
+        { id: 1, label: "Plagiolepis pygmaea",           color: "#3cb44b" }, // green
+        { id: 2, label: "Crematogaster scutellaris",     color: "#ffe119" }, // yellow
+        { id: 3, label: "Temnothorax spp.",              color: "#4363d8" }, // blue
+        { id: 4, label: "Dolichoderus quadripunctatus",  color: "#f58231" }, // orange
+        { id: 5, label: "Colobopsis truncata",           color: "#911eb4" }  // purple
+    ];
+}
 
 // Derived maps for quick lookup
 const CLASS_MAP = CLASS_DEFS.reduce((acc, c) => {
