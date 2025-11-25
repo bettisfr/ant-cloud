@@ -12,16 +12,21 @@ const DEL_SIZE = 16;
 const DEL_PAD = 4;
 
 const STATIC_UPLOADS_BASE = "/static/uploads";
+const LABEL_ALPHA = 0.0;   // 0 = fully transparent, 1 = fully opaque
 
 // -------------------- CLASS DEFINITIONS --------------------
 // Single source of truth for classes: id, label, color
+// const CLASS_DEFS = [
+//     { id: 0, label: "Camponotus vagus",              color: "#e6194B" }, // red
+//     { id: 1, label: "Plagiolepis pygmaea",           color: "#3cb44b" }, // green
+//     { id: 2, label: "Crematogaster scutellaris",     color: "#ffe119" }, // yellow
+//     { id: 3, label: "Temnothorax spp.",              color: "#4363d8" }, // blue
+//     { id: 4, label: "Dolichoderus quadripunctatus",  color: "#f58231" }, // orange
+//     { id: 5, label: "Colobopsis truncata",           color: "#911eb4" }  // purple
+// ];
+
 const CLASS_DEFS = [
-    { id: 0, label: "Camponotus vagus",              color: "#e6194B" }, // red
-    { id: 1, label: "Plagiolepis pygmaea",           color: "#3cb44b" }, // green
-    { id: 2, label: "Crematogaster scutellaris",     color: "#ffe119" }, // yellow
-    { id: 3, label: "Temnothorax spp.",              color: "#4363d8" }, // blue
-    { id: 4, label: "Dolichoderus quadripunctatus",  color: "#f58231" }, // orange
-    { id: 5, label: "Colobopsis truncata",           color: "#911eb4" }  // purple
+    { id: 0, label: "Halyomorpha halys",              color: "#e6194B" }, // red
 ];
 
 // Derived maps for quick lookup
@@ -308,7 +313,7 @@ function drawBBoxes(imgEl, canvasEl, labs) {
         ctx.strokeStyle = col;
 
         // transparent fill (20%)
-        ctx.fillStyle = hexToRGBA(col, 0.20);
+        ctx.fillStyle = hexToRGBA(col, LABEL_ALPHA);
 
         ctx.fillRect(x, y, w, h);
         ctx.strokeRect(x, y, w, h);
