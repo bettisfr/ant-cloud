@@ -1,52 +1,47 @@
 from flask import Flask, request, render_template, jsonify
 import os
+import json
 
 app = Flask(__name__)
 
-# ----------------------------------------------------------------------
-# Directories
-# ----------------------------------------------------------------------
-BASE_DIR = os.path.dirname(__file__)
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")   # images live here
-LABELS_DIR = UPLOAD_DIR                            # labels: same folder
+# Paths
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
+LABELS_DIR = UPLOAD_DIR              # same folder for images and labels
+STATUS_PATH = os.path.join(LABELS_DIR, "status.json")
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(LABELS_DIR, exist_ok=True)
 
 
-# ----------------------------------------------------------------------
-# Routes
-# ----------------------------------------------------------------------
+def load_status():
+    """Load global status.json, return {} if missing or invalid."""
+    if not os.path.exists(STATUS_PATH) or os.path.getsize(STATUS_PATH) == 0:
+        return {}
+
+    try:
+        with open(STATUS_PATH, "r") as f:
+            return json.load(f)
+    except Exception:
+        # Corrupt or invalid JSON -> start fresh
+        return {}
+
+
+def save_status(status_dict):
+    """Overwrite status.json with the given dict."""
+    with open(STATUS_PATH, "w") as f:
+        json.dump(status_dict, f, indent=2)
+
+
 @app.route("/label")
 def label_page():
-    """
-    Open the labeling UI for a server-side image.
-    Called as:  /label?image=img_20250523-160427.jpg
-    """
     image_name = request.args.get("image")
     if not image_name:
         return "Missing 'image' parameter", 400
-
-    img_path = os.path.join(UPLOAD_DIR, image_name)
-    if not os.path.exists(img_path):
-        return f"Image '{image_name}' not found on server.", 404
-
     return render_template("labeler.html", image_name=image_name)
 
 
 @app.route("/save_labels", methods=["POST"])
 def save_labels():
-    """
-    Save labels in YOLO format next to the image (same base name, .txt).
-    Expects JSON:
-    {
-        "image": "img_20250523-160427.jpg",
-        "labels": [
-            {"cls": 0, "x_center": 0.5, "y_center": 0.5, "width": 0.2, "height": 0.1},
-            ...
-        ]
-    }
-    """
     data = request.get_json(silent=True) or {}
     image_name = data.get("image")
     labels = data.get("labels", [])
@@ -54,32 +49,72 @@ def save_labels():
     if not image_name:
         return jsonify({"status": "error", "message": "Missing 'image' field"}), 400
 
+    # Path to YOLO txt
     base, _ = os.path.splitext(image_name)
     label_path = os.path.join(LABELS_DIR, base + ".txt")
 
-    try:
-        lines = []
-        for l in labels:
+    # --- 1) Build YOLO GT lines only for NON-FP labels ---
+    yolo_lines = []
+    status_entry = []
+
+    for l in labels:
+        try:
             cls = int(l["cls"])
             xc = float(l["x_center"])
             yc = float(l["y_center"])
             w = float(l["width"])
             h = float(l["height"])
-            lines.append(f"{cls} {xc:.6f} {yc:.6f} {w:.6f} {h:.6f}")
+        except (KeyError, ValueError, TypeError):
+            # skip malformed label
+            continue
 
-        with open(label_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
+        # Accept both is_fp and isFp from the client
+        is_fp = bool(l.get("is_fp") or l.get("isFp"))
 
-        return jsonify(
-            {
-                "status": "success",
-                "message": f"Saved {len(labels)} labels to {os.path.basename(label_path)}",
-            }
-        )
+        # Store full info (for status.json)
+        status_entry.append({
+            "cls": cls,
+            "x_center": xc,
+            "y_center": yc,
+            "width": w,
+            "height": h,
+            "is_tp": not is_fp
+        })
+
+        # Only non-FP boxes go into YOLO txt
+        if not is_fp:
+            yolo_lines.append(f"{cls} {xc:.6f} {yc:.6f} {w:.6f} {h:.6f}")
+
+    # Write YOLO txt (TP-only); empty file if no lines
+    try:
+        with open(label_path, "w") as f:
+            if yolo_lines:
+                f.write("\n".join(yolo_lines) + "\n")
+            else:
+                # explicitly truncate to empty file
+                f.write("")
+
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": f"Failed to write label txt: {e}"}), 500
+
+    # --- 2) Update global status.json ---
+    try:
+        status = load_status()
+        # Overwrite or create entry for this image
+        status[image_name] = status_entry
+        save_status(status)
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to update status.json: {e}"}), 500
+
+    kept = len([s for s in status_entry if not s["is_fp"]])
+    total = len(status_entry)
+
+    return jsonify({
+        "status": "success",
+        "message": f"Saved {kept} GT labels (out of {total} total boxes) for {image_name}."
+    })
 
 
 if __name__ == "__main__":
-    # Run on 5001, separate from server-picture (5000)
+    # Run on 5001, separate from the main gallery server (5000)
     app.run(host="0.0.0.0", port=5001, debug=True)

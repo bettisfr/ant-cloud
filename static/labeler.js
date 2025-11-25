@@ -169,6 +169,43 @@ function drawDeleteIcon(ctx, x, y, size = DEL_SIZE) {
     ctx.restore();
 }
 
+function drawFpIcon(ctx, x, y, size = DEL_SIZE, color = "black") {
+    const r = 3;
+    ctx.save();
+
+    // background
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+
+    const w = size, h = size;
+
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+
+    ctx.fill();
+    ctx.stroke();
+
+    // "O" symbol
+    ctx.fillStyle = color;
+    ctx.font = `${size * 0.65}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("O", x + w / 2, y + h / 2);
+
+    ctx.restore();
+}
+
+
 function drawClassIcon(ctx, text, x, y, size, color="black") {
     const r = 3;   // corner radius
     ctx.save();
@@ -214,6 +251,13 @@ function isInsideDeleteIcon(px, py, boxX, boxY, boxW, boxH) {
     return (px >= ix && px <= ix + DEL_SIZE && py >= iy && py <= iy + DEL_SIZE);
 }
 
+function isInsideFpIcon(px, py, boxX, boxY, boxW, boxH) {
+    const ix = boxX + boxW - DEL_PAD - DEL_SIZE;
+    const iy = boxY + boxH - DEL_PAD - DEL_SIZE;
+    return (px >= ix && px <= ix + DEL_SIZE && py >= iy && py <= iy + DEL_SIZE);
+}
+
+
 function setStatus(msg) {
     const s = document.getElementById("status");
     if (s) {
@@ -222,7 +266,6 @@ function setStatus(msg) {
 }
 
 /* -------------------- PARSING / SAVING LABELS -------------------- */
-
 function parseYoloTxt(text) {
     const lines = text.split(/\r?\n/);
     const out = [];
@@ -230,11 +273,19 @@ function parseYoloTxt(text) {
         const parts = line.trim().split(/\s+/);
         if (parts.length === 5) {
             const [cls, xc, yc, w, h] = parts.map(Number);
-            out.push({ cls, x_center: xc, y_center: yc, width: w, height: h });
+            out.push({
+                cls,
+                x_center: xc,
+                y_center: yc,
+                width: w,
+                height: h,
+                is_fp: false      // default: TP
+            });
         }
     }
     return out;
 }
+
 
 // Server-side save: POST JSON to /save_labels
 async function saveLabels() {
@@ -251,13 +302,15 @@ async function saveLabels() {
                 x_center: l.x_center,
                 y_center: l.y_center,
                 width: l.width,
-                height: l.height
+                height: l.height,
+                // normalize property for the server:
+                is_fp: !!(l.is_fp || l.isFp)
             }))
         };
 
         const res = await fetch("/save_labels", {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
 
@@ -275,6 +328,7 @@ async function saveLabels() {
         setStatus("Save failed: " + (err && err.message ? err.message : err));
     }
 }
+
 
 
 /* -------------------- CANVAS & DRAWING -------------------- */
@@ -314,26 +368,46 @@ function drawBBoxes(imgEl, canvasEl, labs) {
         // choose color based on class
         const col = CLASS_COLOR[lab.cls] || "#ff0000";
 
-        // stroke
+        // stroke + fill
         ctx.strokeStyle = col;
-
-        // transparent fill (20%)
         ctx.fillStyle = hexToRGBA(col, LABEL_ALPHA);
 
         ctx.fillRect(x, y, w, h);
         ctx.strokeRect(x, y, w, h);
 
+        // species initials for the label badge
         const species = CLASS_MAP[lab.cls] || lab.cls;
         const initials = species.split(/\s+/).map(w => w[0]).join("").toUpperCase();
-        drawClassIcon(ctx, initials, x + DEL_PAD-5, y + DEL_PAD-25, DEL_SIZE);
+        drawClassIcon(ctx, initials, x + DEL_PAD - 5, y + DEL_PAD - 25, DEL_SIZE);
 
+        // delete icon (top-right)
         drawDeleteIcon(ctx, x + w - DEL_PAD - DEL_SIZE, y + DEL_PAD, DEL_SIZE);
+
+        // FP icon (bottom-right)
+        // if lab.isFp is true, use same box color; otherwise a neutral dark
+        const fpColor = lab.isFp ? col : "#333333";
+        drawFpIcon(ctx, x + w - DEL_PAD - DEL_SIZE, y + h - DEL_PAD - DEL_SIZE, DEL_SIZE, fpColor);
+
+        // diagonal cross if marked as false negative
+        if (lab.isFp) {
+            ctx.save();
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + w, y + h);
+            ctx.moveTo(x + w, y);
+            ctx.lineTo(x, y + h);
+            ctx.stroke();
+            ctx.restore();
+        }
 
         if (selected) {
             drawHandles(ctx, x, y, w, h);
         }
     }
 }
+
 
 function hexToRGBA(hex, alpha) {
     const r = parseInt(hex.slice(1,3), 16);
@@ -416,6 +490,18 @@ function initBboxInteraction() {
                 return;
             }
         }
+
+        // FP icon: toggle false-negative flag
+        for (let i = labels.length - 1; i >= 0; i--) {
+            const b = getBoxPx(labels[i], W, H);
+            if (isInsideFpIcon(pt.x, pt.y, b.x, b.y, b.w, b.h)) {
+                const lab = labels[i];
+                lab.isFp = !lab.isFp;
+                refreshUI(lab.isFp ? "Marked as false negative." : "Unmarked false negative.");
+                return;
+            }
+        }
+
 
         const h = hitTestHandle(pt, labels, W, H);
         if (h) {
@@ -506,8 +592,10 @@ function initBboxInteraction() {
                 x_center: (nb.x + nb.w / 2) / W,
                 y_center: (nb.y + nb.h / 2) / H,
                 width: nb.w / W,
-                height: nb.h / H
+                height: nb.h / H,
+                is_fp: false    // new box is TP by default
             });
+
             selectedId = labels.length - 1;
             drawBBoxes(img, canvas, labels);
             renderLabelsList();
