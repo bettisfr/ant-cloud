@@ -325,7 +325,7 @@ function drawBBoxes(imgEl, canvasEl, labs) {
 
         const species = CLASS_MAP[lab.cls] || lab.cls;
         const initials = species.split(/\s+/).map(w => w[0]).join("").toUpperCase();
-        drawClassIcon(ctx, initials, x + DEL_PAD, y + DEL_PAD, DEL_SIZE);
+        drawClassIcon(ctx, initials, x + DEL_PAD-5, y + DEL_PAD-25, DEL_SIZE);
 
         drawDeleteIcon(ctx, x + w - DEL_PAD - DEL_SIZE, y + DEL_PAD, DEL_SIZE);
 
