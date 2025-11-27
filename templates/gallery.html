@@ -42,22 +42,28 @@
     <div class="row mb-4">
         <div class="col-md-4">
             <input
-                type="text"
-                id="filterInput"
-                class="form-control"
-                placeholder="Filter images..."
+                    type="text"
+                    id="filterInput"
+                    class="form-control"
+                    placeholder="Filter images..."
             >
         </div>
-        <div class="col-md-3 d-flex align-items-center">
+        <div class="col-md-5 d-flex align-items-center">
             <input
-                type="checkbox"
-                id="onlyLabeledCheckbox"
-                class="form-check-input me-2"
+                    type="checkbox"
+                    id="onlyLabeledCheckbox"
+                    class="form-check-input me-2"
             >
-            <label for="onlyLabeledCheckbox" class="form-check-label">
-                Only NON labeled
+            <label for="onlyLabeledCheckbox" class="form-check-label me-3">
+                Non labeled only
             </label>
+
+            <!-- NEW: labeled counter -->
+            <span id="labeledCounter" class="text-muted" style="font-size:0.9em;">
+        0 / 0 labeled
+    </span>
         </div>
+
     </div>
     <!-- END FILTER BAR -->
 

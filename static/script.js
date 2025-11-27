@@ -22,20 +22,38 @@ function loadGalleryImages() {
     }
 
     fetch(url)
-        .then(response => response.json())
-        .then(images => {
-            console.log("Fetched images:", images);
+    .then(response => response.json())
+    .then(images => {
 
-            // server already sorts by timestamp; keep your filename sort if you like
-            images.sort((a, b) => b.filename.localeCompare(a.filename));
+        // --- NEW: compute labeled stats BEFORE filters ---
+        // To get true totals, we must fetch all images (unfiltered)
+        return fetch('/get-images')
+            .then(res => res.json())
+            .then(allImages => {
+                const total = allImages.length;
+                const labeled = allImages.filter(img => img.is_labeled).length;
 
-            gallery.innerHTML = ""; // Clear gallery
+                const counter = document.getElementById('labeledCounter');
+                if (counter) {
+                    counter.textContent = `${labeled} / ${total} labeled`;
+                }
 
-            images.forEach(imageData => {
-                addImageToGallery(imageData, false); // Add image without real-time effect
+                return images;  // pass original filtered list through
             });
-        })
-        .catch(error => console.error('Error fetching images:', error));
+    })
+
+    .then(images => {
+        console.log("Fetched images (filtered):", images);
+
+        images.sort((a, b) => b.filename.localeCompare(a.filename));
+
+        gallery.innerHTML = "";
+
+        images.forEach(imageData => {
+            addImageToGallery(imageData, false);
+        });
+    })
+
 }
 
 
