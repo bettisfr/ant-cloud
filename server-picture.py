@@ -5,6 +5,7 @@ import os
 import io
 import zipfile
 import time
+import json
 import piexif
 
 app = Flask(__name__)
@@ -16,8 +17,21 @@ socketio = SocketIO(app, async_mode='eventlet')
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 UPLOAD_FOLDER = os.path.join(STATIC_DIR, "uploads")   # images AND labels_live here
 LABELS_FOLDER = UPLOAD_FOLDER                         # alias: labels next to images
+STATUS_PATH = os.path.join(LABELS_FOLDER, "status.json")
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def load_status():
+    """Load status.json created by the labeler server (if present)."""
+    if not os.path.exists(STATUS_PATH):
+        return {}
+    try:
+        with open(STATUS_PATH, "r") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
 # ----------------------------------------------------------------------
@@ -249,7 +263,39 @@ def uploaded_images():
 
 @app.route("/get-images")
 def get_images():
-    return jsonify(get_sorted_images(UPLOAD_FOLDER))
+    """
+    Return the list of images with optional filtering.
+
+    Query parameters:
+      - filter: substring (case-insensitive) to match in filename
+      - only_labeled: if true/1/yes → keep only images that have an entry in status.json
+    """
+    # read query params
+    filter_str = request.args.get("filter", "").strip().lower()
+    only_labeled_raw = request.args.get("only_labeled", "false").strip().lower()
+    only_labeled = only_labeled_raw in ("1", "true", "yes", "on")
+
+    images = get_sorted_images(UPLOAD_FOLDER)
+    status = load_status()
+
+    # add is_labeled flag to each image (true if present in status.json)
+    for img in images:
+        fname = img.get("filename")
+        img["is_labeled"] = fname in status
+
+    # apply filename filter (if any)
+    if filter_str:
+        images = [
+            img for img in images
+            if filter_str in img["filename"].lower()
+        ]
+
+    # apply "only non labeled" filter
+    if only_labeled:  # NOW means: only NON-labeled
+        images = [img for img in images if not img.get("is_labeled")]
+
+    return jsonify(images)
+
 
 
 @app.route("/delete-image", methods=["POST"])

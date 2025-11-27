@@ -3,17 +3,33 @@ const gallery = document.querySelector('#gallery');  // Select gallery container
 
 // Fetch and display all images from the server
 function loadGalleryImages() {
-    fetch('/get-images')
+    const filterInput = document.getElementById('filterInput');
+    const onlyLabeledCheckbox = document.getElementById('onlyLabeledCheckbox');
+
+    let url = '/get-images';
+    const params = [];
+
+    if (filterInput && filterInput.value.trim() !== '') {
+        params.push('filter=' + encodeURIComponent(filterInput.value.trim()));
+    }
+
+    if (onlyLabeledCheckbox && onlyLabeledCheckbox.checked) {
+        params.push('only_labeled=1');  // means NON-labeled only
+    }
+
+    if (params.length > 0) {
+        url += '?' + params.join('&');
+    }
+
+    fetch(url)
         .then(response => response.json())
         .then(images => {
-            console.log("Fetched images (before sort):", images); // Debugging
+            console.log("Fetched images:", images);
 
-            // 🔽 Sort by filename descending (newest first, thanks to the timestamp prefix)
+            // server already sorts by timestamp; keep your filename sort if you like
             images.sort((a, b) => b.filename.localeCompare(a.filename));
 
-            console.log("Fetched images (after sort):", images); // Debugging
-
-            gallery.innerHTML = ""; // Clear gallery before adding new images
+            gallery.innerHTML = ""; // Clear gallery
 
             images.forEach(imageData => {
                 addImageToGallery(imageData, false); // Add image without real-time effect
@@ -21,6 +37,7 @@ function loadGalleryImages() {
         })
         .catch(error => console.error('Error fetching images:', error));
 }
+
 
 
 // Add an image to the gallery with optional real-time effect
@@ -88,10 +105,17 @@ function addImageToGallery(imageData, isRealTime = true) {
     //     GPS: (${imageData.metadata?.latitude ?? 'N/A'}, ${imageData.metadata?.longitude ?? 'N/A'})<br>
     //     ${isRealTime ? '<em>Uploaded just now</em>' : ''}
     // `;
+    const labeledText = imageData.is_labeled
+    ? '🟩 labeled'
+    : '⬜ non-labeled';
+
+
     metadataDiv.innerHTML = `
         ${imageData.filename}
-        (<strong>Labels: ${imageData.labels_count ?? 0}</strong>)
+        (<strong>Labels: ${imageData.labels_count ?? 0}</strong>)<br>
+        ${labeledText}
     `;
+
 
     // order: X button on top, then img, then metadata
     div.appendChild(deleteBtn);
@@ -111,11 +135,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('downloadDatasetBtn');
     if (btn) {
         btn.addEventListener('click', () => {
-            // simplest: just navigate to the route, browser downloads the zip
             window.location.href = '/download-dataset';
         });
     }
+
+    const filterInput = document.getElementById('filterInput');
+    const onlyLabeledCheckbox = document.getElementById('onlyLabeledCheckbox');
+
+    if (filterInput) {
+        // reload on typing (you can debounce later if needed)
+        filterInput.addEventListener('input', () => {
+            loadGalleryImages();
+        });
+    }
+
+    if (onlyLabeledCheckbox) {
+        onlyLabeledCheckbox.addEventListener('change', () => {
+            loadGalleryImages();
+        });
+    }
 });
+
 
 // Lazy loading for images (loads only when they are near the viewport)
 function lazyLoadImage(img) {
