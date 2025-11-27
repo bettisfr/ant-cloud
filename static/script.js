@@ -25,20 +25,20 @@ function loadGalleryImages() {
     .then(response => response.json())
     .then(images => {
 
-        // --- NEW: compute labeled stats BEFORE filters ---
-        // To get true totals, we must fetch all images (unfiltered)
+        // --- Compute global stats (unfiltered) ---
         return fetch('/get-images')
             .then(res => res.json())
             .then(allImages => {
                 const total = allImages.length;
                 const labeled = allImages.filter(img => img.is_labeled).length;
+                const shown = images.length;
 
                 const counter = document.getElementById('labeledCounter');
                 if (counter) {
-                    counter.textContent = `${labeled} / ${total} labeled`;
+                    counter.textContent = `${labeled} / ${total} labeled (shown ${shown})`;
                 }
 
-                return images;  // pass original filtered list through
+                return images;
             });
     })
 
@@ -53,6 +53,7 @@ function loadGalleryImages() {
             addImageToGallery(imageData, false);
         });
     })
+
 
 }
 
