@@ -407,7 +407,7 @@ function drawBBoxes(imgEl, canvasEl, labs) {
         const h = lab.height * H;
 
         const selected = (i === selectedId);
-        ctx.lineWidth = selected ? 3 : 2;
+        ctx.lineWidth = selected ? 6 : 5;
 
         // choose color based on class
         const col = CLASS_COLOR[lab.cls] || "#ff0000";
