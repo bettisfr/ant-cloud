@@ -45,21 +45,33 @@ const CLASS_COLOR = CLASS_DEFS.reduce((acc, c) => {
     return acc;
 }, {});
 
+// -------------------- ZOOM STATE --------------------
+const zoomState = {
+    scale: 1,
+    minScale: 0.25,
+    maxScale: 4,
+    x: 0,
+    y: 0,
+    isPanning: false,
+    startX: 0,
+    startY: 0,
+};
+
+function applyTransform() {
+    const stage = document.getElementById("imageArea");
+    if (!stage) return;
+    stage.style.transformOrigin = "0 0";
+    stage.style.transform =
+        `translate(${zoomState.x}px, ${zoomState.y}px) scale(${zoomState.scale})`;
+}
+
+
 // -------------------- INIT --------------------
 document.addEventListener("DOMContentLoaded", () => {
     initBboxInteraction();
     initZoom();
 
     setStatus("Waiting for image parameter (?image=...).");
-
-    const newBtn = document.getElementById("newBoxBtn");
-    if (newBtn) {
-        newBtn.addEventListener("click", () => {
-            setStatus("Draw a new box: click and drag on the image.");
-            createMode = true;
-            selectedId = null;
-        });
-    }
 
     const saveBtn = document.getElementById("saveTxtBtn");
     if (saveBtn) {
@@ -94,9 +106,11 @@ async function loadServerImage(filename) {
     const imgURL = `${STATIC_UPLOADS_BASE}/${filename}`;
 
     img.onload = () => {
-        fitCanvasToImage(img, canvas);
+        fitCanvasToImage(img, canvas);  // sets natural size for img + canvas
+        resetZoomToFit();               // scales & centers to fit viewer
         drawBBoxes(img, canvas, labels);
     };
+
 
     img.onerror = () => {
         setStatus(`Cannot load image: ${imgURL}`);
@@ -356,20 +370,28 @@ async function saveLabels() {
 /* -------------------- CANVAS & DRAWING -------------------- */
 
 function fitCanvasToImage(imgEl, canvasEl) {
-    const w = imgEl.clientWidth;
-    const h = imgEl.clientHeight;
+    // Use the image's natural pixel size
+    const w = imgEl.naturalWidth;
+    const h = imgEl.naturalHeight;
     if (!w || !h) {
         return;
     }
+
+    // Set image display size explicitly
+    imgEl.style.width = w + "px";
+    imgEl.style.height = h + "px";
+
+    // Match canvas to the image size (1:1 pixels)
     canvasEl.width = w;
     canvasEl.height = h;
     canvasEl.style.width = w + "px";
     canvasEl.style.height = h + "px";
 }
 
+
 function drawBBoxes(imgEl, canvasEl, labs) {
     if (!imgEl || !canvasEl) return;
-    fitCanvasToImage(imgEl, canvasEl);
+    // fitCanvasToImage(imgEl, canvasEl);
 
     const ctx = canvasEl.getContext("2d");
     ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
@@ -495,70 +517,70 @@ function initBboxInteraction() {
         const pt = posFromEvent(ev);
         const W = canvas.width, H = canvas.height;
 
-        if (createMode) {
-            drawStartPt = pt;
-            drawPreview = {x: pt.x, y: pt.y, w: 0, h: 0};
-            dragMode = "drawing";
-            return;
-        }
-
-        for (let i = labels.length - 1; i >= 0; i--) {
-            const b = getBoxPx(labels[i], W, H);
-            if (isInsideDeleteIcon(pt.x, pt.y, b.x, b.y, b.w, b.h)) {
-                labels.splice(i, 1);
-                if (selectedId !== null) {
-                    if (selectedId === i) selectedId = null;
-                    else if (selectedId > i) selectedId -= 1;
+        // Left button → create, move, resize logic
+        if (ev.button === 0) {
+            // --- 1) Do we hit DELETE icon? ---
+            for (let i = labels.length - 1; i >= 0; i--) {
+                const b = getBoxPx(labels[i], W, H);
+                if (isInsideDeleteIcon(pt.x, pt.y, b.x, b.y, b.w, b.h)) {
+                    labels.splice(i, 1);
+                    if (selectedId !== null) {
+                        if (selectedId === i) selectedId = null;
+                        else if (selectedId > i) selectedId -= 1;
+                    }
+                    refreshUI("Label deleted.");
+                    return;
                 }
-                refreshUI("Label deleted.");
+            }
+
+            // --- 2) Hit FP icon? → toggle TP/FP ---
+            for (let i = labels.length - 1; i >= 0; i--) {
+                const b = getBoxPx(labels[i], W, H);
+                if (isInsideFpIcon(pt.x, pt.y, b.x, b.y, b.w, b.h)) {
+                    labels[i].is_tp = !(labels[i].is_tp !== false);
+                    refreshUI("Toggled TP/FP.");
+                    return;
+                }
+            }
+
+            // --- 3) Hit a resize handle? ---
+            const h = hitTestHandle(pt, labels, W, H);
+            if (h) {
+                selectedId = h.id;
+                activeHandle = h.handle;
+                dragMode = "resize";
+                startPt = pt;
+                startBox = getBoxPx(labels[selectedId], W, H);
+                drawBBoxes(img, canvas, labels);
+                renderLabelsList();
                 return;
             }
-        }
 
-        // FP icon: toggle TP/FP flag (stored as is_tp)
-        for (let i = labels.length - 1; i >= 0; i--) {
-            const b = getBoxPx(labels[i], W, H);
-            if (isInsideFpIcon(pt.x, pt.y, b.x, b.y, b.w, b.h)) {
-                const lab = labels[i];
-                const curTp = (lab.is_tp !== false);
-                const nextTp = !curTp;       // click → flip
-                lab.is_tp = nextTp;
-                refreshUI(nextTp ? "Marked as true positive." : "Marked as false positive.");
+            // --- 4) Hit an existing box? → move it
+            const id = hitTestBox(pt, labels, W, H);
+            if (id !== null) {
+                selectedId = id;
+                activeHandle = -1;
+                dragMode = "move";
+                startPt = pt;
+                startBox = getBoxPx(labels[selectedId], W, H);
+                drawBBoxes(img, canvas, labels);
+                renderLabelsList();
                 return;
             }
-        }
 
-
-        const h = hitTestHandle(pt, labels, W, H);
-        if (h) {
-            selectedId = h.id;
-            activeHandle = h.handle;
-            dragMode = "resize";
-            startPt = pt;
-            startBox = getBoxPx(labels[selectedId], W, H);
-            drawBBoxes(img, canvas, labels);
-            renderLabelsList();
+            // --- 5) Empty space → start DRAWING a new box ---
+            createMode = true;
+            drawStartPt = pt;
+            drawPreview = { x: pt.x, y: pt.y, w: 0, h: 0 };
+            dragMode = "drawing";
+            selectedId = null;
             return;
         }
 
-        const id = hitTestBox(pt, labels, W, H);
-        if (id !== null) {
-            selectedId = id;
-            activeHandle = -1;
-            dragMode = "move";
-            startPt = pt;
-            startBox = getBoxPx(labels[selectedId], W, H);
-            drawBBoxes(img, canvas, labels);
-            renderLabelsList();
-            return;
-        }
-
-        selectedId = null;
-        dragMode = "idle";
-        activeHandle = -1;
-        drawBBoxes(img, canvas, labels);
-        renderLabelsList();
+        // Right/middle → panning handled elsewhere
     });
+
 
     canvas.addEventListener("mousemove", ev => {
         const pt = posFromEvent(ev);
@@ -815,17 +837,84 @@ function renderLabelsList() {
 }
 
 function initZoom() {
-    const range = document.getElementById("zoomRange");
-    const pctEl = document.getElementById("zoomPct");
     const stage = document.getElementById("imageArea");
-    if (!range || !pctEl || !stage) return;
+    if (!stage) return;
 
-    const apply = val => {
-        const scale = val / 100;
-        stage.style.transform = `scale(${scale})`;
-        pctEl.textContent = `${val}%`;
-    };
+    applyTransform();  // apply initial (scale=1) transform
 
-    range.addEventListener("input", e => apply(e.target.value));
-    apply(range.value);
+    // --- Zoom with mouse wheel, keeping cursor point fixed ---
+    stage.addEventListener("wheel", (e) => {
+        e.preventDefault();
+
+        const rect = stage.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+
+        const zoomFactor = 1.1;
+        const oldScale = zoomState.scale;
+        let newScale = oldScale * (e.deltaY < 0 ? zoomFactor : 1 / zoomFactor);
+
+        newScale = Math.max(zoomState.minScale, Math.min(zoomState.maxScale, newScale));
+        const scaleFactor = newScale / oldScale;
+
+        // keep the point under the cursor fixed
+        zoomState.x = zoomState.x + offsetX * (1 - scaleFactor);
+        zoomState.y = zoomState.y + offsetY * (1 - scaleFactor);
+
+        zoomState.scale = newScale;
+        applyTransform();
+    }, { passive: false });
+
+    // --- Pan with mouse drag (middle or right button) ---
+    stage.addEventListener("mousedown", (e) => {
+        if (e.button !== 1 && e.button !== 2) {
+            return;
+        }
+        e.preventDefault();
+        zoomState.isPanning = true;
+        zoomState.startX = e.clientX - zoomState.x;
+        zoomState.startY = e.clientY - zoomState.y;
+    });
+
+    window.addEventListener("mousemove", (e) => {
+        if (!zoomState.isPanning) return;
+        zoomState.x = e.clientX - zoomState.startX;
+        zoomState.y = e.clientY - zoomState.startY;
+        applyTransform();
+    });
+
+    window.addEventListener("mouseup", () => {
+        zoomState.isPanning = false;
+    });
+
+    stage.addEventListener("contextmenu", (e) => e.preventDefault());
 }
+
+function resetZoomToFit() {
+    const viewer = document.getElementById("viewer");
+    const img = document.getElementById("previewImage");
+    if (!viewer || !img) return;
+
+    const imgW = img.naturalWidth;
+    const imgH = img.naturalHeight;
+    if (!imgW || !imgH) return;
+
+    const vw = viewer.clientWidth;
+    const vh = viewer.clientHeight;
+    if (!vw || !vh) return;
+
+    // scale so the whole image fits in the viewer, but don't upscale above 1
+    const scale = Math.min(vw / imgW, vh / imgH, 1);
+
+    zoomState.scale = scale;
+
+    // center the image in the viewer
+    const offsetX = (vw - imgW * scale) / 2;
+    const offsetY = (vh - imgH * scale) / 2;
+    zoomState.x = offsetX;
+    zoomState.y = offsetY;
+
+    applyTransform();
+}
+
+

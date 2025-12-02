@@ -17,8 +17,6 @@
 
     <!-- Sidebar -->
     <aside id="sidebar">
-        <h2>Image Labeler</h2>
-
         <!-- No file selection here; keep container in case you want
              extra controls later, but it will stay empty -->
         <div id="options"></div>
@@ -27,32 +25,24 @@
             <div id="status">Waiting for image parameter (?image=...).</div>
 
             <section id="info" style="margin-top:10px;">
-                <strong>Image info</strong>
                 <p><b>File:</b> <span id="imgName">—</span></p>
                 <p><b>Labels:</b> <span id="numLabels">—</span></p>
             </section>
 
             <hr>
 
-            <section id="viewPanel">
-                <strong>View</strong>
-                <label for="zoomRange" style="display:block; margin-top:6px;">
-                    Zoom: <span id="zoomPct">100%</span>
-                </label>
-                <input id="zoomRange" type="range" min="10" max="400" step="5" value="100">
-            </section>
-
-            <hr>
-
             <section id="labelsPanel">
-                <strong>Labels</strong>
-                <div id="labelsList"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <strong>Labels</strong>
+                </div>
+
+                <div id="labelsList" style="margin-top:10px;"></div>
             </section>
 
-            <div style="margin-top:8px;">
-                <button id="newBoxBtn" class="option-button">New Box</button>
+            <div style="margin-top:12px;">
                 <button id="saveTxtBtn" class="option-button">Save labels</button>
             </div>
+
         </div>
     </aside>
 
