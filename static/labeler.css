@@ -68,6 +68,16 @@ button.option-button:hover {
     background-color: #0056b3;
 }
 
+/* Make the "Save labels" button green */
+#saveTxtBtn {
+    background-color: #28a745;
+}
+
+#saveTxtBtn:hover {
+    background-color: #218838;
+}
+
+
 .label-row {
     display: flex;
     align-items: center;

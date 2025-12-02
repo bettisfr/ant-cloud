@@ -265,12 +265,25 @@ function isInsideFpIcon(px, py, boxX, boxY, boxW, boxH) {
 }
 
 
-function setStatus(msg) {
+function setStatus(msg, kind = "normal") {
     const s = document.getElementById("status");
-    if (s) {
-        s.textContent = msg;
+    if (!s) return;
+
+    s.textContent = msg;
+
+    // reset to default
+    s.style.fontWeight = "normal";
+    s.style.color = "#000";
+
+    if (kind === "success") {
+        s.style.fontWeight = "bold";
+        s.style.color = "#28a745"; // green
+    } else if (kind === "error") {
+        s.style.fontWeight = "bold";
+        s.style.color = "#b00020"; // red
     }
 }
+
 
 /* -------------------- PARSING / SAVING LABELS -------------------- */
 function parseYoloTxt(text) {
@@ -297,7 +310,7 @@ function parseYoloTxt(text) {
 // Server-side save: POST JSON to /save_labels
 async function saveLabels() {
     if (!currentImage || !currentImage.name) {
-        setStatus("No image loaded, cannot save.");
+        setStatus("No image loaded, cannot save.", "error");
         return;
     }
 
@@ -312,7 +325,6 @@ async function saveLabels() {
                 height: l.height,
                 is_tp: (l.is_tp !== false)   // only flag we send
             }))
-
         };
 
         const res = await fetch("/save_labels", {
@@ -330,12 +342,16 @@ async function saveLabels() {
             throw new Error(data.message || "Unknown error");
         }
 
-        setStatus(data.message || "Labels saved.");
+        // ✅ success: bold + green (handled inside setStatus)
+        setStatus(data.message || "Labels saved.", "success");
     } catch (err) {
-        setStatus("Save failed: " + (err && err.message ? err.message : err));
+        // ❌ error: bold + red (handled inside setStatus)
+        setStatus(
+            "Save failed: " + (err && err.message ? err.message : err),
+            "error"
+        );
     }
 }
-
 
 /* -------------------- CANVAS & DRAWING -------------------- */
 
