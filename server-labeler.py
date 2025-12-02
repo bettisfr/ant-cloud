@@ -10,36 +10,66 @@ app = Flask(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
-LABELS_DIR = UPLOAD_DIR  # images + txt + status.json
-STATUS_PATH = os.path.join(LABELS_DIR, "status.json")
 
+IMAGES_DIR = os.path.join(UPLOAD_DIR, "images")   # image files
+LABELS_DIR = os.path.join(UPLOAD_DIR, "labels")   # YOLO txt
+JSONS_DIR = os.path.join(UPLOAD_DIR, "jsons")     # per-image json
+
+os.makedirs(IMAGES_DIR, exist_ok=True)
 os.makedirs(LABELS_DIR, exist_ok=True)
+os.makedirs(JSONS_DIR, exist_ok=True)
 
 
 # ----------------------------------------------------------------------
 # HELPERS
 # ----------------------------------------------------------------------
-def load_status():
-    """Load global status.json, return {} if missing or invalid."""
-    if not os.path.exists(STATUS_PATH) or os.path.getsize(STATUS_PATH) == 0:
-        return {}
-    try:
-        with open(STATUS_PATH, "r") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-
-def save_status(status_dict):
-    """Overwrite status.json with the given dict."""
-    with open(STATUS_PATH, "w") as f:
-        json.dump(status_dict, f, indent=2)
+def json_path(image_name: str) -> str:
+    """
+    Path of the per-image JSON file for this image.
+    E.g. azz2.jpg -> jsons/azz2.json
+    """
+    base, _ = os.path.splitext(image_name)
+    return os.path.join(JSONS_DIR, base + ".json")
 
 
 def yolo_txt_path(image_name: str) -> str:
+    """
+    Path of the YOLO txt file for this image.
+    E.g. azz2.jpg -> labels/azz2.txt
+    """
     base, _ = os.path.splitext(image_name)
     return os.path.join(LABELS_DIR, base + ".txt")
+
+
+def load_labels_from_json(image_name: str):
+    """
+    Load per-image labels from jsons/<stem>.json.
+
+    Returns:
+        list of label dicts or None if file missing/invalid.
+    """
+    jpath = json_path(image_name)
+    if not os.path.exists(jpath) or os.path.getsize(jpath) == 0:
+        return None
+
+    try:
+        with open(jpath, "r") as f:
+            data = json.load(f)
+        # We expect a list of dicts
+        if isinstance(data, list):
+            return data
+        return None
+    except Exception:
+        return None
+
+
+def save_labels_to_json(image_name: str, labels_list):
+    """
+    Save per-image labels to jsons/<stem>.json.
+    """
+    jpath = json_path(image_name)
+    with open(jpath, "w") as f:
+        json.dump(labels_list, f, indent=2)
 
 
 # ----------------------------------------------------------------------
@@ -60,18 +90,17 @@ def get_labels():
     Return all boxes for an image.
 
     Priority:
-    1) If image is present in status.json → use that (authoritative).
+    1) If per-image jsons/<stem>.json exists → use that (authoritative).
     2) Else, if YOLO txt exists → load those as is_tp = True.
     """
     image_name = request.args.get("image")
     if not image_name:
         return jsonify({"status": "error", "message": "Missing 'image' parameter"}), 400
 
-    status = load_status()
-    entry = status.get(image_name)
     labels_out = []
 
-    # --- 1) From status.json ---
+    # --- 1) From per-image JSON (authoritative) ---
+    entry = load_labels_from_json(image_name)
     if isinstance(entry, list):
         for l in entry:
             try:
@@ -138,8 +167,8 @@ def save_labels():
     """
     Save labels for one image.
 
-    - status.json: full boxes with is_tp (True/False).
-    - YOLO txt: only boxes with is_tp == True.
+    - jsons/<stem>.json: full boxes with is_tp (True/False).
+    - labels/<stem>.txt: only boxes with is_tp == True (YOLO format).
     """
     data = request.get_json(silent=True) or {}
     image_name = data.get("image")
@@ -194,15 +223,13 @@ def save_labels():
             "message": f"Failed to write label txt: {e}"
         }), 500
 
-    # --- update status.json ---
+    # --- write per-image JSON ---
     try:
-        status = load_status()
-        status[image_name] = status_entry
-        save_status(status)
+        save_labels_to_json(image_name, status_entry)
     except Exception as e:
         return jsonify({
             "status": "error",
-            "message": f"Failed to update status.json: {e}"
+            "message": f"Failed to write JSON: {e}"
         }), 500
 
     kept = sum(1 for s in status_entry if s.get("is_tp", True))

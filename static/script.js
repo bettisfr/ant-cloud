@@ -1,6 +1,9 @@
 const socket = io();  // Connect to the WebSocket server
 const gallery = document.querySelector('#gallery');  // Select gallery container
 
+// NEW: base path now points to images/ subfolder
+const STATIC_UPLOADS_BASE = "/static/uploads/images";
+
 // Fetch and display all images from the server
 function loadGalleryImages() {
     const filterInput = document.getElementById('filterInput');
@@ -14,7 +17,7 @@ function loadGalleryImages() {
     }
 
     if (onlyLabeledCheckbox && onlyLabeledCheckbox.checked) {
-        params.push('only_labeled=1');  // means NON-labeled only
+        params.push('only_labeled=1');  // means NON-labeled only (backend logic)
     }
 
     if (params.length > 0) {
@@ -22,39 +25,38 @@ function loadGalleryImages() {
     }
 
     fetch(url)
-    .then(response => response.json())
-    .then(images => {
+        .then(response => response.json())
+        .then(images => {
 
-        // --- Compute global stats (unfiltered) ---
-        return fetch('/get-images')
-            .then(res => res.json())
-            .then(allImages => {
-                const total = allImages.length;
-                const labeled = allImages.filter(img => img.is_labeled).length;
-                const shown = images.length;
+            // --- Compute global stats (unfiltered) ---
+            return fetch('/get-images')
+                .then(res => res.json())
+                .then(allImages => {
+                    const total = allImages.length;
+                    const labeled = allImages.filter(img => img.is_labeled).length;
+                    const shown = images.length;
 
-                const counter = document.getElementById('labeledCounter');
-                if (counter) {
-                    counter.textContent = `${labeled} / ${total} labeled (shown ${shown})`;
-                }
+                    const counter = document.getElementById('labeledCounter');
+                    if (counter) {
+                        counter.textContent = `${labeled} / ${total} labeled (shown ${shown})`;
+                    }
 
-                return images;
+                    return images;
+                });
+        })
+        .then(images => {
+            console.log("Fetched images (filtered):", images);
+
+            // OPTIONAL: backend already returns them sorted by timestamp
+            // If you prefer that order, comment out the next line.
+            // images.sort((a, b) => b.filename.localeCompare(a.filename));
+
+            gallery.innerHTML = "";
+
+            images.forEach(imageData => {
+                addImageToGallery(imageData, false);
             });
-    })
-
-    .then(images => {
-        console.log("Fetched images (filtered):", images);
-
-        images.sort((a, b) => b.filename.localeCompare(a.filename));
-
-        gallery.innerHTML = "";
-
-        images.forEach(imageData => {
-            addImageToGallery(imageData, false);
         });
-    })
-
-
 }
 
 
@@ -82,25 +84,27 @@ function addImageToGallery(imageData, isRealTime = true) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filename: imageData.filename })
         })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success' || data.status === 'partial') {
-                // remove from DOM
-                div.remove();
-            } else {
-                alert('Delete failed: ' + (data.message || 'unknown error'));
-            }
-        })
-        .catch(err => {
-            console.error('Delete error:', err);
-            alert('Delete failed: ' + err);
-        });
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success' || data.status === 'partial') {
+                    // remove from DOM
+                    div.remove();
+                } else {
+                    alert('Delete failed: ' + (data.message || 'unknown error'));
+                }
+            })
+            .catch(err => {
+                console.error('Delete error:', err);
+                alert('Delete failed: ' + err);
+            });
     });
 
     // Image element with lazy loading
     const img = document.createElement('img');
     img.classList.add('image-gallery-img');
-    img.dataset.src = `/static/uploads/${imageData.filename}`;
+
+    // CHANGED: now uses images/ subfolder
+    img.dataset.src = `${STATIC_UPLOADS_BASE}/${imageData.filename}`;
     img.alt = imageData.filename;
     img.style.visibility = 'hidden';
 
@@ -115,26 +119,16 @@ function addImageToGallery(imageData, isRealTime = true) {
 
     const metadataDiv = document.createElement('div');
     metadataDiv.classList.add('image-metadata');
-    // metadataDiv.innerHTML = `
-    //     <strong>${imageData.filename}</strong><br>
-    //     <strong>Labels: ${imageData.labels_count ?? 0}</strong><br>
-    //     Temperature: ${imageData.metadata?.temperature ?? 'N/A'} °C<br>
-    //     Pressure: ${imageData.metadata?.pressure ?? 'N/A'} hPa<br>
-    //     Humidity: ${imageData.metadata?.humidity ?? 'N/A'} %<br>
-    //     GPS: (${imageData.metadata?.latitude ?? 'N/A'}, ${imageData.metadata?.longitude ?? 'N/A'})<br>
-    //     ${isRealTime ? '<em>Uploaded just now</em>' : ''}
-    // `;
-    const labeledText = imageData.is_labeled
-    ? '🟩 labeled'
-    : '⬜ non-labeled';
 
+    const labeledText = imageData.is_labeled
+        ? '🟩 labeled'
+        : '⬜ non-labeled';
 
     metadataDiv.innerHTML = `
         ${imageData.filename}
         (<strong>Labels: ${imageData.labels_count ?? 0}</strong>)<br>
         ${labeledText}
     `;
-
 
     // order: X button on top, then img, then metadata
     div.appendChild(deleteBtn);
@@ -198,3 +192,15 @@ socket.on('new_image', (data) => {
 
 // Load all images when the page loads
 loadGalleryImages();
+
+// Reload gallery when tab becomes visible again
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+        loadGalleryImages();
+    }
+});
+
+// Also reload when window gets focus
+window.addEventListener("focus", () => {
+    loadGalleryImages();
+});

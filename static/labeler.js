@@ -11,7 +11,7 @@ let drawPreview = null;
 const DEL_SIZE = 16;
 const DEL_PAD = 4;
 
-const STATIC_UPLOADS_BASE = "/static/uploads";
+const STATIC_UPLOADS_BASE = "/static/uploads/images";
 const LABEL_ALPHA = 0.0;   // 0 = fully transparent, 1 = fully opaque
 
 const APP = 0; // 0 = bugs, 1 = ants
