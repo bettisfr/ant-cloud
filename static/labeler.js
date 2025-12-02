@@ -8,7 +8,7 @@ let createMode = false;
 let drawStartPt = null;
 let drawPreview = null;
 
-const DEL_SIZE = 24;   // bigger icon box
+const DEL_SIZE = 32;   // bigger icon box
 const DEL_PAD = 6;     // slightly more spacing
 
 const STATIC_UPLOADS_BASE = "/static/uploads/images";
@@ -407,7 +407,7 @@ function drawBBoxes(imgEl, canvasEl, labs) {
         const h = lab.height * H;
 
         const selected = (i === selectedId);
-        ctx.lineWidth = selected ? 6 : 5;
+        ctx.lineWidth = selected ? 8 : 7;
 
         // choose color based on class
         const col = CLASS_COLOR[lab.cls] || "#ff0000";
