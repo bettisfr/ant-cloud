@@ -8,8 +8,8 @@ let createMode = false;
 let drawStartPt = null;
 let drawPreview = null;
 
-const DEL_SIZE = 16;
-const DEL_PAD = 4;
+const DEL_SIZE = 24;   // bigger icon box
+const DEL_PAD = 6;     // slightly more spacing
 
 const STATIC_UPLOADS_BASE = "/static/uploads/images";
 const LABEL_ALPHA = 0.0;   // 0 = fully transparent, 1 = fully opaque
