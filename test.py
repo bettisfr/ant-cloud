@@ -8,7 +8,7 @@ SERVER_URL = "http://127.0.0.1:5000/receive"
 
 # Ensure uploads folder exists
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
+UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads", "images")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def take_picture():
