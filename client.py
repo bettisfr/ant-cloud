@@ -21,7 +21,7 @@ logging.basicConfig(
 
 # Directory where images are stored
 # IMPORTANT: same as UPLOAD_FOLDER in server-picture.py
-IMAGE_DIR = "static/uploads"
+IMAGE_DIR = "static/uploads/images"
 os.makedirs(IMAGE_DIR, exist_ok=True)
 
 # GPIO setup

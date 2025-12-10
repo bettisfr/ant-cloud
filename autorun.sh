@@ -6,17 +6,23 @@ source ~/antenv/bin/activate
 # Move into the project
 cd ~/ant-cloud || exit
 
-echo "Starting Ant Cloud servers..."
+echo "Starting Ant Cloud servers and client..."
 
-# Start servers in background
-python3 server-picture.py &
+# Start picture server
+python server-picture.py &
 PID1=$!
 
-python3 server-labeler.py &
+# Start labeler server
+python server-labeler.py &
 PID2=$!
+
+# Start GPIO/camera client (the button + GPS + BME280 script)
+python client.py &
+PID3=$!
 
 echo "server-picture.py PID: $PID1"
 echo "server-labeler.py PID: $PID2"
+echo "client.py PID (client): $PID3"
 
 # Keep script alive so children do not die
 wait
